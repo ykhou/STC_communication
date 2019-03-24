@@ -1,0 +1,62 @@
+C51 COMPILER V9.54   MAIN                                                                  01/09/2019 09:17:12 PAGE 1   
+
+
+C51 COMPILER V9.54, COMPILATION OF MODULE MAIN
+OBJECT MODULE PLACED IN .\main.obj
+COMPILER INVOKED BY: D:\Program Files (x86)\keil\C51\BIN\C51.EXE ..\main\main.c LARGE OPTIMIZE(8,SPEED) BROWSE INCDIR(..
+                    -\hardware\chuankou;..\hardware\dongtai;..\hardware\flash;..\hardware\huanjing;..\hardware\led_key;..\hardware\paint;..\h
+                    -ardware\ruqing;..\hardware\touch_main;..\hardware\yaokong;..\hardware\zitai;..\main;..\system\bin;..\system\delay;..\sys
+                    -tem\iic;..\system\interrupt;..\system\spi;..\system\stc;..\tft_touch_sd\font;..\tft_touch_sd\touch;..\tft_touch_sd\tft;.
+                    -.\tft_touch_sd\txt;..\hardware\peizhi;..\hardware\communicat;..\hardware\phonebook) DEBUG OBJECTEXTEND PRINT(.\main.lst)
+                    - TABS(2) OBJECT(.\main.obj)
+
+line level    source
+
+   1          #include "STC15F2K60S2.h"
+   2          #include  "delay.h"         //延时函数
+   3          #include  "touch.h"
+   4          #include  "tft.h"       //TFT IC底层驱
+   5          #include  "txt.h"
+   6          #include  "bin.h"
+   7          #include  "touch_main.h"
+   8          #include "led_key.h"
+   9          #include "flash.h"
+  10          #include "fontcheck.h"
+  11          void main()
+  12          {   
+  13   1        P0M0 = 0X00;  P0M1 = 0X00;
+  14   1        P1M0 = 0X00;  P1M1 = 0X00;
+  15   1        P2M0 = 0X00;  P2M1 = 0X00;
+  16   1        P3M0 = 0X00;  P3M1 = 0X00;
+  17   1        P4M0 = 0X00;  P4M1 = 0X00;
+  18   1        P5M0 = 0X00;  P5M1 = 0X00;
+  19   1        P6M0 = 0X00;  P6M1 = 0X00;
+  20   1        P7M0 = 0X00;  P7M1 = 0X00;
+  21   1        P41=0; //关闭红外发射管
+  22   1      
+  23   1        TFT_Init();                //tft初始化
+  24   1        Touch_InitSpi();
+  25   1        InitSpi();
+  26   1        ftinfoInt();  
+  27   1       
+  28   1        while(1)
+  29   1        {
+  30   2          MainTouch();     //启动 触摸屏 操作界面 
+  31   2        } 
+  32   1        
+  33   1      }
+  34          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =     52    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

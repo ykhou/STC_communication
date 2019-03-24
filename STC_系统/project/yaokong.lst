@@ -1,0 +1,219 @@
+C51 COMPILER V9.54   YAOKONG                                                               01/09/2019 09:17:14 PAGE 1   
+
+
+C51 COMPILER V9.54, COMPILATION OF MODULE YAOKONG
+OBJECT MODULE PLACED IN .\yaokong.obj
+COMPILER INVOKED BY: D:\Program Files (x86)\keil\C51\BIN\C51.EXE ..\hardware\yaokong\yaokong.c LARGE OPTIMIZE(8,SPEED) B
+                    -ROWSE INCDIR(..\hardware\chuankou;..\hardware\dongtai;..\hardware\flash;..\hardware\huanjing;..\hardware\led_key;..\hard
+                    -ware\paint;..\hardware\ruqing;..\hardware\touch_main;..\hardware\yaokong;..\hardware\zitai;..\main;..\system\bin;..\syst
+                    -em\delay;..\system\iic;..\system\interrupt;..\system\spi;..\system\stc;..\tft_touch_sd\font;..\tft_touch_sd\touch;..\tft
+                    -_touch_sd\tft;..\tft_touch_sd\txt;..\hardware\peizhi;..\hardware\communicat;..\hardware\phonebook) DEBUG OBJECTEXTEND PR
+                    -INT(.\yaokong.lst) TABS(2) OBJECT(.\yaokong.obj)
+
+line level    source
+
+   1          #include "tft.h"
+   2          #include "bin.h"
+   3          #include "txt.h"
+   4          #include "touch.h"
+   5          #include "delay.h"
+   6          #include "font.h"
+   7          #include "yaokong.h"
+   8          #include "STC15F2K60S2.h"
+   9          #include "try.h"
+  10          
+  11          sbit JD1 = P3^5;
+  12          sbit JD2 = P5^1;
+  13          sbit CG_IRI =P4^1;
+  14          sbit CG_IRO =P3^2; //输入
+  15          /**
+  16            yaokong.c功能
+  17            继电器功能；
+  18            红外接收和红外发射管；
+  19          */
+  20          
+  21          unsigned char xdata IRCOM[7];
+  22          volatile unsigned char IrFlag;
+  23          void YaokongIOInit(void)
+  24          {
+  25   1        P3M0 |=(1<<5);    //输入
+  26   1        P3M1 &=~(1<<5);    
+  27   1        
+  28   1        P5M0 |=(1<<1); 
+  29   1        P5M1 &=~(1<<1); 
+  30   1        
+  31   1        JD1 =1; //关闭继电器1
+  32   1        JD2 =1; //关闭继电器2
+  33   1      }
+  34          void JD1ON(void)
+  35          {
+  36   1        JD1 =0; //继电器1
+  37   1      }
+  38          void JD2ON(void)
+  39          {
+  40   1        JD2 =0; //继电器1 
+  41   1      }
+  42          void JD1OFF(void)
+  43          {
+  44   1        JD1 =1; //关闭继电器1
+  45   1      }
+  46          void JD2OFF(void)
+  47          {
+  48   1        JD2 =1; //关闭继电器1
+  49   1      }
+  50          void YaokongMFrame(void)
+C51 COMPILER V9.54   YAOKONG                                                               01/09/2019 09:17:14 PAGE 2   
+
+  51          {
+  52   1        TFT_ClearArea(0,16,240,320-16,LIGHTBLUE);
+  53   1        TFT_ClearONELINE(19,BLUE);
+  54   1          TFT_ShowString_W25(0,19,2,"主界面",WHITE,RED);   
+  55   1      
+  56   1        TFT_ClearArea(55,125,112,53,BROWN);
+  57   1        TFT_ClearArea(55+5,125+5,112-7,53-6,CYAN);
+  58   1        TFT_ShowString_W25(9,9,2,"继电器测试",BROWN,CYAN);
+  59   1      }
+  60          void YaokongSFrame(void)
+  61          {
+  62   1      /********外框**********/
+  63   1        TFT_ClearArea(0,16,240,320-16,LIGHTBLUE);
+  64   1        TFT_ClearONELINE(19,BLUE);
+  65   1          TFT_ShowString_W25(0,19,2,"返 回",WHITE,RED);  
+  66   1      }
+  67          
+  68          
+  69          
+  70          /**功能：图像反转,按键效果
+  71          a=1分别表示"红外线测试"的反转色和正常色
+  72          a=2分别表示"继电器测试""的反转色和正常色
+  73          */
+  74          void YaokongPressFrame(unsigned char a)
+  75          {
+  76   1        if(a==2)
+  77   1        { 
+  78   2        TFT_ClearArea(55,125,112,53,RED);
+  79   2        TFT_ClearArea(55+5,125+5,112-7,53-6,CYAN);
+  80   2        TFT_ShowString_W25(9,9,2,"继电器测试",RED,CYAN);
+  81   2        }
+  82   1      }
+  83          
+  84          /*0表示按键关，1表示按键开*/
+  85          void JDButton1Frame(unsigned char a)
+  86          {
+  87   1      /**********按键效果*********/
+  88   1      if(a==0) //button1  OFF
+  89   1      {
+  90   2        TFT_ClearArea(55,75,112,53,WHITE);
+  91   2        TFT_ClearArea(55+5,75+5,112-10,53-10,BROWN);
+  92   2        TFT_ClearArea(111,75+5+2,49,39,WHITE);
+  93   2        TFT_ShowString_W25(15,6,2,"OFF",RED,WHITE);
+  94   2        JD1=1;
+  95   2      }else if(a==1) //button1   ON
+  96   1      {
+  97   2        TFT_ClearArea(55,75,112,53,WHITE);
+  98   2        TFT_ClearArea(55+5,75+5,112-10,53-10,RED);
+  99   2        TFT_ClearArea(62,75+5+2,49,39,WHITE);
+ 100   2        TFT_ShowString_W25(9,6,2,"O N",RED,WHITE);
+ 101   2        JD1=0;
+ 102   2      }
+ 103   1      }
+ 104          /*0表示按键关，1表示按键开*/
+ 105          void JDButton2Frame(unsigned char a)
+ 106          {
+ 107   1      if(a==0) //button2  OFF
+ 108   1      {
+ 109   2        TFT_ClearArea(55,170,112,53,WHITE);
+ 110   2        TFT_ClearArea(55+5,170+5,112-10,53-10,BROWN);
+ 111   2        TFT_ClearArea(111,170+5+2,49,39,WHITE);
+ 112   2        TFT_ShowString_W25(15,12,2,"OFF",RED,WHITE);
+C51 COMPILER V9.54   YAOKONG                                                               01/09/2019 09:17:14 PAGE 3   
+
+ 113   2        JD2=1;
+ 114   2      }else if(a==1) //button1   ON
+ 115   1      {
+ 116   2        TFT_ClearArea(55,170,112,53,WHITE);
+ 117   2        TFT_ClearArea(55+5,170+5,112-10,53-10,RED);
+ 118   2        TFT_ClearArea(62,170+5+2,49,39,WHITE);
+ 119   2        TFT_ShowString_W25(9,12,2,"O N",RED,WHITE);
+ 120   2        JD2=0;
+ 121   2      }
+ 122   1      }
+ 123          void JDQFrame(void)
+ 124          {
+ 125   1      /**********内容*********/
+ 126   1      JDButton1Frame(0);
+ 127   1      JDButton2Frame(0);
+ 128   1      
+ 129   1      /***********功能********************/
+ 130   1      
+ 131   1        while(1)
+ 132   1        {
+ 133   2          if(!Touch_IRQ())
+ 134   2          {
+ 135   3            if(Convert_Pos()) //得到坐标值
+ 136   3            {
+ 137   4              if(tp_pixlcd.x<48&&tp_pixlcd.y>298)   //下标签栏"主界面"
+ 138   4              {JD1=JD2=1; return;      }
+ 139   4      
+ 140   4              if(tp_pixlcd.x<160&&tp_pixlcd.x>111)         
+ 141   4              {
+ 142   5                if(tp_pixlcd.y<121&&tp_pixlcd.y>82)  //BUTTON1 ON 
+ 143   5                {JDButton1Frame(1);}
+ 144   5                else if(tp_pixlcd.y<216&&tp_pixlcd.y>177)//BUTTON2 ON 
+ 145   5                {JDButton2Frame(1);}
+ 146   5              }
+ 147   4              else if(tp_pixlcd.x<111&&tp_pixlcd.x>62)        
+ 148   4              {
+ 149   5                if(tp_pixlcd.y<121&&tp_pixlcd.y>82)  //BUTTON1 OFF 
+ 150   5                {JDButton1Frame(0);}
+ 151   5                else if(tp_pixlcd.y<216&&tp_pixlcd.y>177)//BUTTON2 OFF  
+ 152   5                {JDButton2Frame(0);}            
+ 153   5              }
+ 154   4            }
+ 155   3          }
+ 156   2        }
+ 157   1      }
+ 158          
+ 159          void YaokJidTouch(void)
+ 160          {
+ 161   1          YaokongMFrame();
+ 162   1          YaokongIOInit();
+ 163   1          while(1)
+ 164   1          {
+ 165   2          if(!Touch_IRQ()) //有触摸发生
+ 166   2          {
+ 167   3            if(Convert_Pos()) //得到坐标值
+ 168   3            {
+ 169   4              if(tp_pixlcd.x<48&&tp_pixlcd.y>298)   //下标签栏"主界面"
+ 170   4              {return;}
+ 171   4              else if(tp_pixlcd.x>55&&tp_pixlcd.x<167)
+ 172   4              {
+ 173   5                if(tp_pixlcd.y>125&&tp_pixlcd.y<173) 
+ 174   5                { 
+C51 COMPILER V9.54   YAOKONG                                                               01/09/2019 09:17:14 PAGE 4   
+
+ 175   6                  YaokongPressFrame(2);delayms(500);
+ 176   6                  YaokongSFrame(); //功能子界面 
+ 177   6                  JDQFrame();
+ 178   6                  YaokongMFrame(); //功能主界面 
+ 179   6                }
+ 180   5              }       
+ 181   4            }   
+ 182   3          } 
+ 183   2        }
+ 184   1      }
+ 185          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   1333    ----
+   CONSTANT SIZE    =     32    ----
+   XDATA SIZE       =      8       2
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

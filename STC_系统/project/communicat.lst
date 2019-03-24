@@ -1,0 +1,472 @@
+C51 COMPILER V9.54   COMMUNICAT                                                            01/09/2019 15:12:36 PAGE 1   
+
+
+C51 COMPILER V9.54, COMPILATION OF MODULE COMMUNICAT
+OBJECT MODULE PLACED IN .\communicat.obj
+COMPILER INVOKED BY: D:\Program Files (x86)\keil\C51\BIN\C51.EXE ..\hardware\communicat\communicat.c LARGE OPTIMIZE(8,SP
+                    -EED) BROWSE INCDIR(..\hardware\chuankou;..\hardware\dongtai;..\hardware\flash;..\hardware\huanjing;..\hardware\led_key;.
+                    -.\hardware\paint;..\hardware\ruqing;..\hardware\touch_main;..\hardware\yaokong;..\hardware\zitai;..\main;..\system\bin;.
+                    -.\system\delay;..\system\iic;..\system\interrupt;..\system\spi;..\system\stc;..\tft_touch_sd\font;..\tft_touch_sd\touch;
+                    -..\tft_touch_sd\tft;..\tft_touch_sd\txt;..\hardware\peizhi;..\hardware\communicat;..\hardware\phonebook) DEBUG OBJECTEXT
+                    -END PRINT(.\communicat.lst) TABS(2) OBJECT(.\communicat.obj)
+
+line level    source
+
+   1          #include <stdio.h>
+   2          #include <string.h>
+   3          #include "STC15F2K60S2.h"
+   4          #include "communicat.h"
+   5          #include "tft.h"
+   6          #include "txt.h"
+   7          #include "touch.h"
+   8          #include "delay.h"
+   9          #include "touch_main.h"
+  10          #include "chuankou.h"
+  11          #include "ruqing.h"
+  12          
+  13          unsigned char STA[19]={0};
+  14          unsigned char ldnum[12]=0;    //用于存在3G模块传回信息中的来电号码
+  15          unsigned char phonenum[12]={0}; //去电号码
+  16          char time=0;
+  17          int restart = 0;
+  18          int G = 1;
+  19          extern unsigned char BEEPON;
+  20          extern unsigned char CIDFlag1;    //Caller Identification  来电显示
+  21          extern unsigned char RINGFlag;  //电话呼入
+  22          extern unsigned char TouchNumber;
+  23          
+  24          /************************ 通话界面***********************/ 
+  25          void CommunicatFrame(void)
+  26          {
+  27   1        TFT_ClearONELINE(0,RED);
+  28   1        TFT_ShowString(0,0,"CPU:STC15W4K48S4",WHITE,RED);
+  29   1        TFT_ShowString_W25(20,0,2,"易思达科技",WHITE,RED);
+  30   1        
+  31   1        TFT_ClearArea(0,16,240,320-16,LIGHTBLUE);
+  32   1        
+  33   1        TFT_ShowString_W25(0,19,2,"主界面",WHITE,RED);
+  34   1      
+  35   1        LCD_DrawRectangle(16,16,224,56,BLUE);
+  36   1        Draw_Circle(48,92,24,BLUE);//1
+  37   1        Draw_Circle(120,92,24,BLUE);//2
+  38   1        Draw_Circle(192,92,24,BLUE);//3
+  39   1        Draw_Circle(48,152,24,BLUE);//4
+  40   1        Draw_Circle(120,152,24,BLUE);//5
+  41   1        Draw_Circle(192,152,24,BLUE);//6
+  42   1        Draw_Circle(48,214,24,BLUE);//7
+  43   1        Draw_Circle(120,214,24,BLUE);//8
+  44   1        Draw_Circle(192,214,24,BLUE);//9
+  45   1        Draw_Circle(48,276,24,BLUE);//C
+  46   1        Draw_Circle(120,276,24,BLUE);//0
+  47   1        Draw_Circle(192,276,24,BLUE);//G
+  48   1      
+  49   1      
+  50   1        TFT_ShowString_W25(2,2,4,"1",BLACK,LIGHTBLUE);
+C51 COMPILER V9.54   COMMUNICAT                                                            01/09/2019 15:12:36 PAGE 2   
+
+  51   1        TFT_ShowString_W25(7,2,4,"2",BLACK,LIGHTBLUE);
+  52   1        TFT_ShowString_W25(12,2,4,"3",BLACK,LIGHTBLUE);
+  53   1      
+  54   1        TFT_ShowString_W25(2,4,4,"4",BLACK,LIGHTBLUE);
+  55   1        TFT_ShowString_W25(7,4,4,"5",BLACK,LIGHTBLUE);
+  56   1        TFT_ShowString_W25(12,4,4,"6",BLACK,LIGHTBLUE);
+  57   1      
+  58   1        TFT_ShowString_W25(2,6,4,"7",BLACK,LIGHTBLUE);
+  59   1        TFT_ShowString_W25(7,6,4,"8",BLACK,LIGHTBLUE);
+  60   1        TFT_ShowString_W25(12,6,4,"9",BLACK,LIGHTBLUE);
+  61   1        
+  62   1        TFT_ShowString_W25(2,8,4,"C",BLACK,LIGHTBLUE);
+  63   1        TFT_ShowString_W25(7,8,4,"0",BLACK,LIGHTBLUE);
+  64   1        TFT_ShowString_W25(12,8,4,"D",BLACK,LIGHTBLUE);
+  65   1      }
+  66          
+  67          /************************拨号***********************/
+  68          void CommunicatTouch(void)
+  69          { 
+  70   1        restart = 0;
+  71   1        TouchNumber=0;
+  72   1        G = 1;
+  73   1        CommunicatFrame();
+  74   1        while(1)
+  75   1        {
+  76   2          
+  77   2          while(1)
+  78   2          { 
+  79   3            laidian(); 
+  80   3            if(!Touch_IRQ())
+  81   3            {
+  82   4              if(Convert_Pos()) //得到坐标值
+  83   4              {
+  84   5                TouchNumber=0;
+  85   5                if(tp_pixlcd.x<48 && tp_pixlcd.y>304)  //下标签栏"主界面"
+  86   5                {
+  87   6                  restart=1;  
+  88   6                  break;
+  89   6                }
+  90   5                else if(tp_pixlcd.y>80 && tp_pixlcd.y<104)   //第1排
+  91   5                {
+  92   6                  if(tp_pixlcd.x>36 && tp_pixlcd.x<60)//1
+  93   6                    {TouchNumber=1;}
+  94   6                  else if(tp_pixlcd.x>108 && tp_pixlcd.x<132)//2
+  95   6                    {TouchNumber=2;}
+  96   6                  else if(tp_pixlcd.x>180 && tp_pixlcd.x<204)//3
+  97   6                    {TouchNumber=3;}
+  98   6      
+  99   6                }
+ 100   5                else if(tp_pixlcd.y>140 && tp_pixlcd.y<164)  //第2排 
+ 101   5                {
+ 102   6                  if(tp_pixlcd.x>36 && tp_pixlcd.x<60)//4
+ 103   6                    {TouchNumber=4;}
+ 104   6                  else if(tp_pixlcd.x>108 && tp_pixlcd.x<132)//5
+ 105   6                    {TouchNumber=5;}
+ 106   6                  else if(tp_pixlcd.x>180 && tp_pixlcd.x<204)//6
+ 107   6                    {TouchNumber=6;}
+ 108   6                    
+ 109   6                }
+ 110   5                else if(tp_pixlcd.y>202 && tp_pixlcd.y<226)  //第3排 
+ 111   5                {
+ 112   6                  if(tp_pixlcd.x>36 && tp_pixlcd.x<60)//7
+C51 COMPILER V9.54   COMMUNICAT                                                            01/09/2019 15:12:36 PAGE 3   
+
+ 113   6                    {TouchNumber=7;}
+ 114   6                  else if(tp_pixlcd.x>108 && tp_pixlcd.x<132)//8
+ 115   6                    {TouchNumber=8;}                      
+ 116   6                  else if(tp_pixlcd.x>180 && tp_pixlcd.x<204)//9
+ 117   6                    {TouchNumber=9;}
+ 118   6                }
+ 119   5                else if(tp_pixlcd.y>264 && tp_pixlcd.y<288)  //第4排 
+ 120   5                {
+ 121   6                  if(tp_pixlcd.x>36 && tp_pixlcd.x<60)//C
+ 122   6                    {TouchNumber=10;}
+ 123   6                  else if(tp_pixlcd.x>108 && tp_pixlcd.x<132)//0
+ 124   6                    {TouchNumber=11;}                     
+ 125   6                  else if(tp_pixlcd.x>180 && tp_pixlcd.x<204)//D
+ 126   6                    {TouchNumber=12;} 
+ 127   6                }
+ 128   5              }
+ 129   4            }
+ 130   3      
+ 131   3                    
+ 132   3                    
+ 133   3                if(TouchNumber==1)
+ 134   3                {
+ 135   4                  Draw_Circle(48,92,24,RED);
+ 136   4                  G++;
+ 137   4                  break;
+ 138   4                  
+ 139   4                }
+ 140   3                else if(TouchNumber==2)
+ 141   3                {
+ 142   4                  Draw_Circle(120,92,24,RED);
+ 143   4                  G++;
+ 144   4                  break;
+ 145   4                }       
+ 146   3                else if(TouchNumber==3)
+ 147   3                {
+ 148   4                  Draw_Circle(192,92,24,RED);
+ 149   4                  G++;
+ 150   4                  break;
+ 151   4                }
+ 152   3                else if(TouchNumber==4)
+ 153   3                {
+ 154   4                  Draw_Circle(48,152,24,RED);
+ 155   4                  G++;
+ 156   4                  break;
+ 157   4                }
+ 158   3                else if(TouchNumber==5)
+ 159   3                {
+ 160   4                  Draw_Circle(120,152,24,RED);
+ 161   4                  G++;
+ 162   4                  break;
+ 163   4                }
+ 164   3                else if(TouchNumber==6)
+ 165   3                {
+ 166   4                  Draw_Circle(192,152,24,RED);
+ 167   4                  G++;
+ 168   4                  break;
+ 169   4                }
+ 170   3                else if(TouchNumber==7)
+ 171   3                {
+ 172   4                  Draw_Circle(48,214,24,RED);
+ 173   4                  G++;
+ 174   4                  break;
+C51 COMPILER V9.54   COMMUNICAT                                                            01/09/2019 15:12:36 PAGE 4   
+
+ 175   4                }
+ 176   3                else if(TouchNumber==8)
+ 177   3                {
+ 178   4                  Draw_Circle(120,214,24,RED);
+ 179   4                  G++;
+ 180   4                  break;
+ 181   4                }
+ 182   3                else if(TouchNumber==9)
+ 183   3                {
+ 184   4                  Draw_Circle(192,214,24,RED);
+ 185   4                  G++;
+ 186   4                  break;
+ 187   4                }
+ 188   3                else if(TouchNumber==10)
+ 189   3                {
+ 190   4                  Draw_Circle(48,276,24,RED);
+ 191   4                  break;
+ 192   4                }
+ 193   3                else if(TouchNumber==11)
+ 194   3                {
+ 195   4                  Draw_Circle(120,276,24,RED);
+ 196   4                  G++;
+ 197   4                  break;
+ 198   4                }
+ 199   3                else if(TouchNumber==12)
+ 200   3                {
+ 201   4                  Draw_Circle(192,276,24,RED);
+ 202   4                  break;
+ 203   4                }           
+ 204   3            }
+ 205   2          
+ 206   2          while(!Touch_IRQ());
+ 207   2          
+ 208   2              switch(TouchNumber)//松开
+ 209   2              {
+ 210   3                case 1:
+ 211   3                {
+ 212   4                  Draw_Circle(48,92,24,BLUE);
+ 213   4                  
+ 214   4                  TFT_ShowString_W25(G,1,3,"1",MAGENTA,LIGHTBLUE);
+ 215   4                  strcat(phonenum,"1");
+ 216   4                  break;
+ 217   4                }
+ 218   3                case 2:
+ 219   3                {
+ 220   4                  Draw_Circle(120,92,24,BLUE);
+ 221   4                  TFT_ShowString_W25(G,1,3,"2",MAGENTA,LIGHTBLUE);
+ 222   4                  strcat(phonenum,"2");
+ 223   4                  break;
+ 224   4                }
+ 225   3                case 3:
+ 226   3                {
+ 227   4                  Draw_Circle(192,92,24,BLUE);
+ 228   4                  TFT_ShowString_W25(G,1,3,"3",MAGENTA,LIGHTBLUE);
+ 229   4                  strcat(phonenum,"3");
+ 230   4                  break;
+ 231   4                }
+ 232   3                case 4:
+ 233   3                {
+ 234   4                  Draw_Circle(48,152,24,BLUE);
+ 235   4                  TFT_ShowString_W25(G,1,3,"4",MAGENTA,LIGHTBLUE);
+ 236   4                  strcat(phonenum,"4");
+C51 COMPILER V9.54   COMMUNICAT                                                            01/09/2019 15:12:36 PAGE 5   
+
+ 237   4                  break;
+ 238   4                }
+ 239   3                case 5:
+ 240   3                {
+ 241   4                  Draw_Circle(120,152,24,BLUE);
+ 242   4                  TFT_ShowString_W25(G,1,3,"5",MAGENTA,LIGHTBLUE);
+ 243   4                  strcat(phonenum,"5");
+ 244   4                  break;
+ 245   4                }
+ 246   3                case 6:
+ 247   3                {
+ 248   4                  Draw_Circle(192,152,24,BLUE);
+ 249   4                  TFT_ShowString_W25(G,1,3,"6",MAGENTA,LIGHTBLUE);
+ 250   4                  strcat(phonenum,"6");
+ 251   4                  break;
+ 252   4                }
+ 253   3                case 7:
+ 254   3                {
+ 255   4                  Draw_Circle(48,214,24,BLUE);
+ 256   4                  TFT_ShowString_W25(G,1,3,"7",MAGENTA,LIGHTBLUE);
+ 257   4                  strcat(phonenum,"7");
+ 258   4                  break;
+ 259   4                }
+ 260   3                case 8:
+ 261   3                {
+ 262   4                  Draw_Circle(120,214,24,BLUE);
+ 263   4                  TFT_ShowString_W25(G,1,3,"8",MAGENTA,LIGHTBLUE);
+ 264   4                  strcat(phonenum,"8");
+ 265   4                  break;
+ 266   4                }
+ 267   3                case 9:
+ 268   3                {
+ 269   4                  Draw_Circle(192,214,24,BLUE);
+ 270   4                  TFT_ShowString_W25(G,1,3,"9",MAGENTA,LIGHTBLUE);
+ 271   4                  strcat(phonenum,"9");
+ 272   4                  break;
+ 273   4                }
+ 274   3                case 10:
+ 275   3                {
+ 276   4                  Draw_Circle(48,276,24,BLUE);
+ 277   4                  restart=1;
+ 278   4                  callnum();
+ 279   4                  break;
+ 280   4                }
+ 281   3                case 11:
+ 282   3                {
+ 283   4                  Draw_Circle(120,276,24,BLUE);
+ 284   4                  TFT_ShowString_W25(G,1,3,"0",MAGENTA,LIGHTBLUE);
+ 285   4                  strcat(phonenum,"0");
+ 286   4                  break;
+ 287   4                }
+ 288   3                case 12:
+ 289   3                {
+ 290   4                  Draw_Circle(192,276,24,BLUE);
+ 291   4                  if(G>1)
+ 292   4                  {
+ 293   5                    TFT_ShowString_W25(G,1,3," ",MAGENTA,LIGHTBLUE);
+ 294   5                    phonenum[G-2]='\0';
+ 295   5                    G--;
+ 296   5                  }
+ 297   4                  break;
+ 298   4                }
+C51 COMPILER V9.54   COMMUNICAT                                                            01/09/2019 15:12:36 PAGE 6   
+
+ 299   3            }
+ 300   2          TouchNumber=0;
+ 301   2          if(restart == 1)
+ 302   2          {
+ 303   3            restart=0;
+ 304   3            MainTouch();
+ 305   3            break;
+ 306   3          }
+ 307   2        }
+ 308   1      }
+ 309          
+ 310          /************************正在通话节界面***********************/
+ 311          extern unsigned char OKFlag;
+ 312          //-----------------------------给3G模块发送拨打号码的指令--------------------------------------//
+ 313          void callnum()
+ 314          {
+ 315   1        
+ 316   1        OKFlag=0;
+ 317   1        SendStr1("AT+SNFS=0\r\n");  //将音频通道调整为耳机                               这里还应该加上检测超时怎
+             -么办
+ 318   1        while(OKFlag!=1);
+ 319   1        strcpy(STA,"ATD");
+ 320   1        strcat(STA,phonenum);
+ 321   1        strcat(STA,"\r\n");
+ 322   1        SendStr1(STA);
+ 323   1        time=0;
+ 324   1        calling();
+ 325   1      }
+ 326          //----------------------------------主动拨打电话时界面--------------------------------------//
+ 327          void calling()
+ 328          {
+ 329   1        TFT_ClearArea(0,16,240,320-16,WHITE);
+ 330   1        TFT_ShowString_W25(9,7,2,"  CALLING...",BLUE,WHITE);
+ 331   1        LCD_DrawBox(50,200,150,50,RED);
+ 332   1        TFT_ShowString_W25(13,14,2,"挂断",WHITE,RED);
+ 333   1        TFT_ShowString_W25(9,4,2,phonenum,RED,WHITE);
+ 334   1        
+ 335   1        while(1)
+ 336   1        {  
+ 337   2          if(!Touch_IRQ())
+ 338   2          {
+ 339   3            if(Convert_Pos()) //得到坐标值
+ 340   3            {
+ 341   4              if(tp_pixlcd.x>50&&tp_pixlcd.x<200)   
+ 342   4                {
+ 343   5                if(tp_pixlcd.y>200&&tp_pixlcd.y<250)         
+ 344   5                {
+ 345   6                  SendStr1("ATH\r\n");    //发送挂断指令
+ 346   6                  memset(phonenum,'\0',sizeof(phonenum));
+ 347   6                  memset(STA,'\0',sizeof(STA));
+ 348   6                  break;       //跳转到主界面       
+ 349   6                }
+ 350   5              }
+ 351   4            }
+ 352   3          }
+ 353   2        } 
+ 354   1      }
+ 355          //----------------------------------被叫界面--------------------------------------//
+ 356          void receive(void)
+ 357          {
+ 358   1        TFT_ClearArea(0,16,240,320-16,WHITE);
+ 359   1        TFT_ShowString_W25(11,5,2,"有来电...",BLUE,WHITE);
+C51 COMPILER V9.54   COMMUNICAT                                                            01/09/2019 15:12:36 PAGE 7   
+
+ 360   1        TFT_ShowString_W25(9,7,2,ldnum,BLUE,WHITE);
+ 361   1        LCD_DrawBox(0,250,120,69,GREEN);
+ 362   1        LCD_DrawBox(121,250,119,69,RED);
+ 363   1        TFT_ShowString_W25(3,17,2,"ANSWER",WHITE,GREEN);
+ 364   1        TFT_ShowString_W25(19,17,2,"挂断",WHITE,RED);
+ 365   1        
+ 366   1        TR0=1;
+ 367   1        BEEPON=1;
+ 368   1        memset(ldnum,'\0',sizeof(ldnum));
+ 369   1        SendStr1("AT+SNFS=0\r\n");  //将音频通道调整为耳机 
+ 370   1        
+ 371   1        while(1)
+ 372   1        { 
+ 373   2          
+ 374   2          if(!Touch_IRQ())
+ 375   2          {
+ 376   3            if(Convert_Pos()) //得到坐标值
+ 377   3            {
+ 378   4              if(tp_pixlcd.x>0&&tp_pixlcd.x<120)    
+ 379   4                if(tp_pixlcd.y>250&&tp_pixlcd.y<319)         
+ 380   4                {
+ 381   5                    while(!Touch_IRQ());           //等待触摸松开（这一步很重要）
+ 382   5                    SendStr1("ATA\r\n");           //给3G模块发送接听的指令
+ 383   5                    TFT_ShowString_W25(10,5,2,"CALLING...",BLUE,WHITE);
+ 384   5                    TFT_ShowString_W25(9,7,2,ldnum,BLUE,WHITE);
+ 385   5                    TR0=0;
+ 386   5                    BEEPON=0;
+ 387   5                  
+ 388   5                }
+ 389   4              if(tp_pixlcd.x>120&&tp_pixlcd.x<239)
+ 390   4              {         
+ 391   5                if(tp_pixlcd.y>250&&tp_pixlcd.y<319)         
+ 392   5                {
+ 393   6                  SendStr1("ATH\r\n");          //给3G模块发送挂断的指令
+ 394   6                  TR0=0; 
+ 395   6                  BEEPON=0;
+ 396   6                  delayms(1000);
+ 397   6                  RINGFlag=0;
+ 398   6                  MainTouch();
+ 399   6                  //break;
+ 400   6                }
+ 401   5              }
+ 402   4              
+ 403   4            }
+ 404   3          }
+ 405   2          //if(RINGFlag==0)
+ 406   2            //break;
+ 407   2        }
+ 408   1      } 
+ 409          
+ 410          //----------------------------------来电时信息提取判断部分-------------------//
+ 411          extern unsigned char LXSZFlag;   //来电显示设置
+ 412          void laidian(void)
+ 413          {
+ 414   1        if(RINGFlag==1&&CIDFlag1==1)
+ 415   1        {
+ 416   2            
+ 417   2          CIDFlag1=0;
+ 418   2          RINGFlag=0;
+ 419   2          receive();
+ 420   2                  
+ 421   2        }
+C51 COMPILER V9.54   COMMUNICAT                                                            01/09/2019 15:12:36 PAGE 8   
+
+ 422   1        else if(RINGFlag==1)
+ 423   1        {
+ 424   2          
+ 425   2          RINGFlag=0;
+ 426   2          receive();
+ 427   2                  
+ 428   2        }
+ 429   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   4124    ----
+   CONSTANT SIZE    =    138    ----
+   XDATA SIZE       =     48    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

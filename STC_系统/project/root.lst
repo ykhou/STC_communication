@@ -1,0 +1,183 @@
+C51 COMPILER V9.05   ROOT                                                                  09/09/2016 17:02:04 PAGE 1   
+
+
+C51 COMPILER V9.05, COMPILATION OF MODULE ROOT
+OBJECT MODULE PLACED IN .\root.obj
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE ..\hardware\root\root.c LARGE BROWSE INCDIR(..\hardware\chuankou;..\hardwar
+                    -e\dongtai;..\hardware\flash;..\hardware\huanjing;..\hardware\led_key;..\hardware\paint;..\hardware\ruqing;..\hardware\to
+                    -uch_main;..\hardware\yaokong;..\hardware\zitai;..\main;..\system\bin;..\system\delay;..\system\iic;..\system\interrupt;.
+                    -.\system\spi;..\system\stc;..\tft_touch_sd\font;..\tft_touch_sd\touch;..\tft_touch_sd\tft;..\tft_touch_sd\txt) DEBUG OBJ
+                    -ECTEXTEND PRINT(.\root.lst) OBJECT(.\root.obj)
+
+line level    source
+
+   1          #include "touch.h"
+   2          #include "font.h"
+   3          #include "tft.h"
+   4          #include "bin.h"
+   5          #include "txt.h"
+   6          #include "delay.h"
+   7          
+   8          void RootFrame(void)
+   9          { 
+  10   1              TFT_ClearONELINE(0,RED);
+  11   1          TFT_ShowString(0,0,"CPU:STC15W4K48S4",WHITE,RED);                    
+  12   1              TFT_ShowString_SD(20,0,"Ò×Ë¼´ï¿Æ¼¼",WHITE,RED);
+  13   1          //TFT_ShowString(22,0,"»ªÏÄÑ§Ôº",WHITE,RED);
+  14   1              TFT_ClearArea(0,16,240,320-32,LIGHTBLUE); //Çå¿ÕÏÔÊ¾Çø
+  15   1              TFT_ClearONELINE(19,BLUE);
+  16   1          TFT_ShowString_SD(0,19,"Ö÷½çÃæ",WHITE,RED); 
+  17   1              TFT_ShowString_SD(12,19,"ÉÏÒ»Ò³",WHITE,RED);                     
+  18   1              TFT_ShowString_SD(24,19,"ÏÂÒ»Ò³",WHITE,RED);
+  19   1      }
+  20          void RootScan(void)
+  21          { 
+  22   1              RootFrame();
+  23   1              doc_info.DOC_rootwjx=0;           //³õÊ¼»¯ÉÈÇø¡¢ÎÄ¼þÏîºÍÊúÐÐ³õÊ¼ÐÐÊýµÄÆ«ÒÆÁ¿
+*** ERROR C200 IN LINE 23 OF ..\hardware\root\root.c: left side of '.' requires struct/union
+  24   1              doc_info.DOC_rootsq=0;
+  25   1              doc_info.DOC_rootsh=0;
+  26   1              SCAN_WJ(OPEN_WJJ(OPEN_WJJ(fat_info.BPB_FirstCluster_number,"SYS"),"TBP"));               //½«Í¼±êµØÖ·²É¼¯³öÀ´ ÎªÎÄ¼þÍ
+             -¼±êÏÔÊ¾×ö×¼±¸
+  27   1               //É¨ÃèSD¿¨¸ùÄ¿Â¼  
+  28   1          SCAN_ROOT(fat_info.BPB_FirstCluster_number);
+  29   1      } 
+  30          void PageUp(void)
+  31          {
+  32   1              unsigned char i;
+  33   1              RootFrame();    
+  34   1              for(i=0;i<16;i++)                                  //Çå¿Õ ÉÏÒ»´Î²É¼¯µÄ ¿ªÊ¼´Ø ½áÊø´Ø ºÍºó×º±êÖ¾Êý×éº¯Êý ÒÔ·ÀÖ¹¸ÉÈÅ
+  35   1              {
+  36   2                      doc_info.DOC_FstClusL[i]=0;                        //¿ªÊ¼´ØµÄ´ØºÅ
+  37   2              doc_info.DOC_Filesize[i]=0;                                //ÎÄ¼þ´óÐ¡£¬µ¥Î»Îª×Ö½Ú  
+  38   2              doc_info.DOC_Judge[i]=0;                                           //ºó×ºÃû
+  39   2              }
+  40   1              doc_info.DOC_rootwjx=0;           //³õÊ¼»¯ÉÈÇø¡¢ÎÄ¼þÏîºÍÊúÐÐ³õÊ¼ÐÐÊýµÄÆ«ÒÆÁ¿
+  41   1              doc_info.DOC_rootsq=0;
+  42   1              doc_info.DOC_rootsh=0;
+  43   1              SCAN_ROOT(fat_info.BPB_FirstCluster_number);
+  44   1      }
+  45          void PageDown(void)
+  46          {
+  47   1              unsigned char i;
+  48   1              RootFrame();
+  49   1              for(i=0;i<16;i++)                                  //Çå¿Õ ÉÏÒ»´Î²É¼¯µÄ ¿ªÊ¼´Ø ½áÊø´Ø ºÍºó×º±êÖ¾Êý×éº¯Êý ÒÔ·ÀÖ¹¸ÉÈÅ
+C51 COMPILER V9.05   ROOT                                                                  09/09/2016 17:02:04 PAGE 2   
+
+  50   1              {
+  51   2                      doc_info.DOC_FstClusL[i]=0;                        //¿ªÊ¼´ØµÄ´ØºÅ
+  52   2              doc_info.DOC_Filesize[i]=0;                                //ÎÄ¼þ´óÐ¡£¬µ¥Î»Îª×Ö½Ú  
+  53   2              doc_info.DOC_Judge[i]=0;                                           //ºó×ºÃû
+  54   2              }
+  55   1              SCAN_ROOT(fat_info.BPB_FirstCluster_number);//É¨ÃèSD¿¨¸ùÄ¿Â¼ 
+  56   1      }
+  57          /***************************/
+  58          //¸ùÄ¿Â¼  ´¥Ãþ¿é ·¶Î§
+  59          //µ±ÓÐ´¥ÃþÊÂ¼þ·´Éúºó É¨Ãè¸Ãº¯Êý À´ÅÐ¶Ï ¾ßÌåµÄ´¥ÃþÎ»ÖÃ¶ÔÓ¦µÄÑ¡Ïî
+  60          //¹²14ÐÐ
+  61          unsigned char ClickRoot(void) 
+  62          {
+  63   1              unsigned char result=0;
+  64   1              if(Touch_IRQ()==0)
+  65   1              {
+  66   2                      if(Convert_Pos())       //µÃµ½×ø±êÖµ
+  67   2                      {
+  68   3                              if(tp_pixlcd.x>14&&tp_pixlcd.x<240&&tp_pixlcd.y>16+2+20&&tp_pixlcd.y<16+2+20+20)//µÚÒ»¸öÍ¼±ê
+  69   3                                      result=1;
+  70   3                              else if(tp_pixlcd.x>14&&tp_pixlcd.x<240&&tp_pixlcd.y>58&&tp_pixlcd.y<58+20)
+  71   3                                      result=2;
+  72   3                              else if(tp_pixlcd.x>14&&tp_pixlcd.x<240&&tp_pixlcd.y>78&&tp_pixlcd.y<78+20)
+  73   3                                      result=3;
+  74   3                              else if(tp_pixlcd.x>14&&tp_pixlcd.x<240&&tp_pixlcd.y>98&&tp_pixlcd.y<98+20)
+  75   3                                      result=4;
+  76   3                              else if(tp_pixlcd.x>14&&tp_pixlcd.x<240&&tp_pixlcd.y>118&&tp_pixlcd.y<118+20)
+  77   3                                      result=5;
+  78   3                              else if(tp_pixlcd.x>14&&tp_pixlcd.x<240&&tp_pixlcd.y>138&&tp_pixlcd.y<138+20)
+  79   3                                      result=6;
+  80   3                              else if(tp_pixlcd.x>14&&tp_pixlcd.x<240&&tp_pixlcd.y>158&&tp_pixlcd.y<158+20)
+  81   3                                      result=7;
+  82   3                              else if(tp_pixlcd.x>14&&tp_pixlcd.x<240&&tp_pixlcd.y>178&&tp_pixlcd.y<178+20)
+  83   3                                      result=8;
+  84   3                              else if(tp_pixlcd.x>14&&tp_pixlcd.x<240&&tp_pixlcd.y>198&&tp_pixlcd.y<198+20)
+  85   3                                      result=9;
+  86   3                              else if(tp_pixlcd.x>14&&tp_pixlcd.x<240&&tp_pixlcd.y>218&&tp_pixlcd.y<218+20)
+  87   3                                      result=10;
+  88   3                              else if(tp_pixlcd.x>14&&tp_pixlcd.x<240&&tp_pixlcd.y>238&&tp_pixlcd.y<238+20)
+  89   3                                      result=11;
+  90   3                              else if(tp_pixlcd.x>14&&tp_pixlcd.x<240&&tp_pixlcd.y>258&&tp_pixlcd.y<258+20)
+  91   3                                      result=12;
+  92   3                              else if(tp_pixlcd.x>14&&tp_pixlcd.x<240&&tp_pixlcd.y>278&&tp_pixlcd.y<278+20)
+  93   3                                      result=13;
+  94   3                              
+  95   3                              else if(tp_pixlcd.x<48&&tp_pixlcd.y>298)          //ÏÂ±êÇ©À¸"Ö÷½çÃæ"
+  96   3                                      result=14;
+  97   3                              else if(tp_pixlcd.x>96&&tp_pixlcd.x<96+48&&tp_pixlcd.y>298)       //ÏÂ±êÇ©À¸ ÉÏÒ»Ò³
+  98   3                                      result=15;
+  99   3                              else if(tp_pixlcd.x>192&&tp_pixlcd.y>298) //ÏÂÒ»Ò³
+ 100   3                                      result=16;
+ 101   3      
+ 102   3                      }
+ 103   2              }
+ 104   1              return result;
+ 105   1      }
+ 106          
+ 107          void RootTouch(void)
+ 108          {
+ 109   1              unsigned char i;
+ 110   1              RootScan();
+ 111   1              while(1)
+C51 COMPILER V9.05   ROOT                                                                  09/09/2016 17:02:04 PAGE 3   
+
+ 112   1              {
+ 113   2              i=0;    
+ 114   2              i=ClickRoot();
+ 115   2              if(i>0)
+ 116   2              {
+ 117   3                      if(i==14) break;
+ 118   3                      else if(i==15)  //ÉÏÒ»Ò³
+ 119   3                      { PageUp();     }
+ 120   3                      else if(i==16)PageDown(); //ÏÂÒ»Ò³
+ 121   3      
+ 122   3                      if(doc_info.DOC_Judge[i]==1)                            //ÅÐ¶Ï µ±Ç°ÎÄ¼þÊÇ·ñÊÇ .binÎÄ¼þ 
+ 123   3                      { 
+ 124   4                              TFT_ShowWord(6,16+4+i*20,8,16,ASCII_816['>'-0x20] ,WHITE,BLUE);
+ 125   4                              delayms(500);                                                                   //Í£ÁôÊ±¼ä
+ 126   4                              TFT_ClearByColor(LIGHTBLUE);
+ 127   4                          DISP_BIN(i);                                                                        //Ö´ÐÐ ¶ÁÏÔÊ¾binÍ¼Æ¬³ÌÐò
+ 128   4                              while(Touch_IRQ()==1);                                             //ËÀÑ­»·µÈ´ý´¥ÃþÖÃÎ»
+ 129   4                              while(Touch_IRQ()==0);                                           //µÈ´ý´¥±ÊÌáÆð
+ 130   4                              RootScan(); 
+ 131   4                  }
+ 132   3                      else if(doc_info.DOC_Judge[i]==2)                                        //ÅÐ¶Ï µ±Ç°ÎÄ¼þÊÇ·ñÊÇ .txtÎÄ¼þ 
+ 133   3                      {
+ 134   4                              TFT_ShowWord(6,16+4+i*20,8,16,ASCII_816['>'-0x20] ,WHITE,BLUE);
+ 135   4                              delayms(500);                                                                   //Í£ÁôÊ±¼ä
+ 136   4                              TFT_ClearArea(0,16,240,320-16,LIGHTBLUE); //Çå¿ÕÏÔÊ¾Çø       //ÇåÆÁ
+ 137   4                              DISP_TXT(i);                                                                    //Ö´ÐÐ ¶ÁtxtÎÄ¼þ³ÌÐò
+ 138   4                              TFT_ClearByColor(LIGHTBLUE);       //ÇåÆÁ
+ 139   4                              RootScan(); 
+ 140   4                  } 
+ 141   3                      else if(doc_info.DOC_Judge[i]==3)                               //ÅÐ¶Ï µ±Ç°ÎÄ¼þÊÇ·ñÊÇ .BMPÎÄ¼þ 
+ 142   3                      { 
+ 143   4                              TFT_ShowWord(6,16+4+i*20,8,16,ASCII_816['>'-0x20] ,WHITE,BLUE);
+ 144   4                          delayms(500);                                                                       //Í£ÁôÊ±¼ä
+ 145   4                              TFT_ClearByColor(LIGHTBLUE);       //ÇåÆÁ
+ 146   4                              DISP_BMP(i);
+ 147   4                              while(Touch_IRQ()==1);                                             //ËÀÑ­»·µÈ´ý´¥ÃþÖÃÎ»
+ 148   4                              while(Touch_IRQ()==0);                                           //µÈ´ý´¥±ÊÌáÆð                                                                 //Ö´ÐÐ ¶ÁÏÔÊ¾bmpÍ¼Æ¬³ÌÐò
+ 149   4                              RootScan(); 
+ 150   4                      } 
+ 151   3                      else if(doc_info.DOC_Judge[i]==8)                                       //ÅÐ¶ÏÊÇ·ñÎªÎÄ¼þ¼Ð
+ 152   3                      {
+ 153   4                              TFT_ShowWord(6,16+4+i*20,8,16,ASCII_816['>'-0x20] ,WHITE,BLUE);
+ 154   4                              RootFrame();
+ 155   4                              doc_info.DOC_rootwjx=0;           //³õÊ¼»¯ÉÈÇø¡¢ÎÄ¼þÏîºÍÊúÐÐ³õÊ¼ÐÐÊýµÄÆ«ÒÆÁ¿
+ 156   4                              doc_info.DOC_rootsq=0;
+ 157   4                              doc_info.DOC_rootsh=0;
+ 158   4                              SCAN_ROOT(doc_info.DOC_FstClusL[i]);
+ 159   4                      }
+ 160   3              }
+ 161   2         }
+ 162   1      }
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  1 ERROR(S)

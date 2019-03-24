@@ -1,0 +1,219 @@
+C51 COMPILER V9.54   CICHANG_HMC5883                                                       01/09/2019 09:17:15 PAGE 1   
+
+
+C51 COMPILER V9.54, COMPILATION OF MODULE CICHANG_HMC5883
+OBJECT MODULE PLACED IN .\cichang_hmc5883.obj
+COMPILER INVOKED BY: D:\Program Files (x86)\keil\C51\BIN\C51.EXE ..\hardware\zitai\cichang_hmc5883.c LARGE OPTIMIZE(8,SP
+                    -EED) BROWSE INCDIR(..\hardware\chuankou;..\hardware\dongtai;..\hardware\flash;..\hardware\huanjing;..\hardware\led_key;.
+                    -.\hardware\paint;..\hardware\ruqing;..\hardware\touch_main;..\hardware\yaokong;..\hardware\zitai;..\main;..\system\bin;.
+                    -.\system\delay;..\system\iic;..\system\interrupt;..\system\spi;..\system\stc;..\tft_touch_sd\font;..\tft_touch_sd\touch;
+                    -..\tft_touch_sd\tft;..\tft_touch_sd\txt;..\hardware\peizhi;..\hardware\communicat;..\hardware\phonebook) DEBUG OBJECTEXT
+                    -END PRINT(.\cichang_hmc5883.lst) TABS(2) OBJECT(.\cichang_hmc5883.obj)
+
+line level    source
+
+   1          #include "STC15F2K60S2.h"
+   2          #include "tft.h"
+   3          #include "txt.h"
+   4          #include "iic.h"
+   5          #include "delay.h"
+   6          #include "cichang_hmc5883.h"
+   7          #include  <math.h>    //Keil library  
+   8          
+   9          
+  10          
+  11          #define HMC5883L_AD   0x3C            //三轴磁场HMC5883L
+  12          //***************************************************
+  13          unsigned char HMC5883BUF[7]='\0';                         //???????   
+  14          unsigned char HMC5883DISPLAY[8]='\0';   
+  15          int  Xdata,Ydata,Zdata;  
+  16          void Single_Write_HMC5883(unsigned char REG_Address,unsigned char REG_data)
+  17          {
+  18   1          I2CStart();                  //????
+  19   1          I2CSendByte(HMC5883L_AD);   //??????+???
+  20   1          I2CSendByte(REG_Address);    //???????,?????pdf 
+  21   1          I2CSendByte(REG_data);       //???????,?????pdf
+  22   1          I2CStop();                   //??????
+  23   1      }
+  24          
+  25          //********??????????*************************
+  26          unsigned char Single_Read_HMC5883(unsigned char REG_Address)
+  27          {  unsigned char REG_data;
+  28   1          I2CStart();                          //????
+  29   1          I2CSendByte(HMC5883L_AD);           //??????+???
+  30   1          I2CSendByte(REG_Address);                   //????????,?0?? 
+  31   1          I2CStart();                          //????
+  32   1          I2CSendByte(HMC5883L_AD+1);         //??????+???
+  33   1          REG_data=I2CRecvByte();              //???????
+  34   1        I2CSendACK(1);   
+  35   1        I2CStop();                           //????
+  36   1          return REG_data; 
+  37   1      }
+  38          //******************************************************
+  39          //
+  40          //????HMC5883??????,????0x3~0x5
+  41          //
+  42          //******************************************************
+  43          void Multiple_read_HMC5883(void)
+  44          {   unsigned char i;
+  45   1          I2CStart();                          //????
+  46   1          I2CSendByte(HMC5883L_AD);           //??????+???
+  47   1          I2CSendByte(0x03);                   //????????,?0x3??  
+  48   1          I2CStart();                          //????
+  49   1          I2CSendByte(HMC5883L_AD+1);         //??????+???
+  50   1         for (i=0; i<6; i++)                      //????6?????,???BUF
+C51 COMPILER V9.54   CICHANG_HMC5883                                                       01/09/2019 09:17:15 PAGE 2   
+
+  51   1          {
+  52   2              HMC5883BUF[i] = I2CRecvByte();          //BUF[0]????
+  53   2              if (i == 5)
+  54   2              {
+  55   3                 I2CSendACK(1);                //?????????NOACK
+  56   3              }
+  57   2              else
+  58   2              {
+  59   3                I2CSendACK(0);                //??ACK
+  60   3             }
+  61   2         }
+  62   1          I2CStop();                          //????
+  63   1          delayms(5);
+  64   1      }
+  65          
+  66          //???HMC5883,???????pdf????****
+  67          void Init_HMC5883()
+  68          {
+  69   1           Single_Write_HMC5883(0x02,0x00);  //
+  70   1      }
+  71          
+  72          
+  73          //***********************************************************************
+  74          //??x?
+  75          void DISP_HMC5883_x()
+  76          {     int temp_data;
+  77   1      Xdata=HMC5883BUF[0] << 8 | HMC5883BUF[1]; //Combine MSB and LSB of X Data output register
+  78   1        temp_data=Xdata;
+  79   1        if(temp_data<0){
+  80   2        temp_data=-temp_data;
+  81   2          HMC5883DISPLAY[0]='-';   
+  82   2        }
+  83   1        else HMC5883DISPLAY[0]='+';
+  84   1          
+  85   1        HMC5883DISPLAY[1]=temp_data/10000+0x30 ;
+  86   1          temp_data=temp_data%10000;   //????
+  87   1        HMC5883DISPLAY[2]=temp_data/1000+0x30 ;
+  88   1          temp_data=temp_data%1000;    //????
+  89   1        HMC5883DISPLAY[3]=temp_data/100+0x30   ;
+  90   1          temp_data=temp_data%100;     //????
+  91   1        HMC5883DISPLAY[4]=temp_data/10+0x30    ;
+  92   1        HMC5883DISPLAY[5]='.';
+  93   1          temp_data=temp_data%10;      //????
+  94   1        HMC5883DISPLAY[6]=temp_data+0x30;   
+  95   1        HMC5883DISPLAY[7]='\0';
+  96   1        TFT_ShowString(0,4,"X:",BLACK,CYAN);
+  97   1        TFT_ShowString(2,4,HMC5883DISPLAY,BLACK,CYAN);
+  98   1      }
+  99          void DISP_HMC5883_y()
+ 100          {    int temp_data; 
+ 101   1      Ydata=HMC5883BUF[4] << 8 | HMC5883BUF[5]; //Combine MSB and LSB of Y Data output register
+ 102   1          temp_data=Ydata;
+ 103   1        if(temp_data<0){
+ 104   2        temp_data=-temp_data;
+ 105   2          HMC5883DISPLAY[0]='-';   
+ 106   2        }
+ 107   1        else HMC5883DISPLAY[0]='+';
+ 108   1          
+ 109   1        HMC5883DISPLAY[1]=temp_data/10000+0x30 ;
+ 110   1          temp_data=temp_data%10000;   //????
+ 111   1        HMC5883DISPLAY[2]=temp_data/1000+0x30 ;
+ 112   1          temp_data=temp_data%1000;    //????
+C51 COMPILER V9.54   CICHANG_HMC5883                                                       01/09/2019 09:17:15 PAGE 3   
+
+ 113   1        HMC5883DISPLAY[3]=temp_data/100+0x30   ;
+ 114   1          temp_data=temp_data%100;     //????
+ 115   1        HMC5883DISPLAY[4]=temp_data/10+0x30    ;
+ 116   1        HMC5883DISPLAY[5]='.';
+ 117   1          temp_data=temp_data%10;      //????
+ 118   1        HMC5883DISPLAY[6]=temp_data+0x30;   
+ 119   1        HMC5883DISPLAY[7]='\0';
+ 120   1        TFT_ShowString(0,5,"Y:",BLACK,CYAN);
+ 121   1        TFT_ShowString(2,5,HMC5883DISPLAY,BLACK,CYAN);
+ 122   1      }
+ 123          void DISP_HMC5883_z()
+ 124          {   int temp_data;  
+ 125   1      Zdata=HMC5883BUF[2] << 8 | HMC5883BUF[3]; //Combine MSB and LSB of Z Data output register
+ 126   1        temp_data=Zdata;
+ 127   1        if(temp_data<0){
+ 128   2        temp_data=-temp_data;
+ 129   2          HMC5883DISPLAY[0]='-';   
+ 130   2        }
+ 131   1        else HMC5883DISPLAY[0]='+';
+ 132   1          
+ 133   1        HMC5883DISPLAY[1]=temp_data/10000+0x30 ;
+ 134   1          temp_data=temp_data%10000;   //????
+ 135   1        HMC5883DISPLAY[2]=temp_data/1000+0x30 ;
+ 136   1          temp_data=temp_data%1000;    //????
+ 137   1        HMC5883DISPLAY[3]=temp_data/100+0x30   ;
+ 138   1          temp_data=temp_data%100;     //????
+ 139   1        HMC5883DISPLAY[4]=temp_data/10+0x30    ;
+ 140   1        HMC5883DISPLAY[5]='.';
+ 141   1          temp_data=temp_data%10;      //????
+ 142   1        HMC5883DISPLAY[6]=temp_data+0x30;   
+ 143   1        HMC5883DISPLAY[7]='\0';
+ 144   1        TFT_ShowString(0,6,"Z:",BLACK,CYAN);
+ 145   1        TFT_ShowString(2,6,HMC5883DISPLAY,BLACK,CYAN);
+ 146   1      }
+ 147          
+ 148          void DISP_HMC5883_angle()
+ 149          {   
+ 150   1         double angle;
+ 151   1         int temp_data; 
+ 152   1         angle= atan2((double)Ydata,(double)Xdata) * (180 / 3.14159265) +180; // angle in degrees,atan2取值-180~
+             -180//
+ 153   1        //保持水平时,与Y轴的夹角,0度表示正北，90表示东，180表示南，270表示西
+ 154   1        //由于加了180度，所以指向与X轴相反,即X轴反方向的指向为指南针北极
+ 155   1        //如果不是水平，要通过三轴加速度来修正
+ 156   1          temp_data= angle*10;
+ 157   1        
+ 158   1          HMC5883DISPLAY[0]=temp_data/10000+0x30 ;
+ 159   1          temp_data=temp_data%10000;   //
+ 160   1          HMC5883DISPLAY[1]=temp_data/1000+0x30 ;
+ 161   1          temp_data=temp_data%1000;    //
+ 162   1          HMC5883DISPLAY[2]=temp_data/100+0x30   ;
+ 163   1          temp_data=temp_data%100;     //
+ 164   1          HMC5883DISPLAY[3]=temp_data/10+0x30    ;
+ 165   1          temp_data=temp_data%10;      //
+ 166   1          HMC5883DISPLAY[4]='.';//小数点
+ 167   1          HMC5883DISPLAY[5]=temp_data+0x30;   
+ 168   1          HMC5883DISPLAY[6]='\0';
+ 169   1            
+ 170   1          TFT_ShowString(0,7,"Angle:",WHITE,BLUE);
+ 171   1          TFT_ShowString(6,7,HMC5883DISPLAY,WHITE,BLUE);    
+ 172   1      }
+ 173          void HMC5883Convert()
+C51 COMPILER V9.54   CICHANG_HMC5883                                                       01/09/2019 09:17:15 PAGE 4   
+
+ 174          {
+ 175   1         Multiple_read_HMC5883();    
+ 176   1        DISP_HMC5883_x();
+ 177   1        DISP_HMC5883_y();
+ 178   1        DISP_HMC5883_z();
+ 179   1        DISP_HMC5883_angle(); 
+ 180   1      } 
+ 181            
+ 182            
+ 183          
+ 184          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   1236    ----
+   CONSTANT SIZE    =     16    ----
+   XDATA SIZE       =     21       9
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

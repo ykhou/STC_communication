@@ -1,0 +1,447 @@
+C51 COMPILER V9.54   CHUANKOU                                                              01/09/2019 14:30:03 PAGE 1   
+
+
+C51 COMPILER V9.54, COMPILATION OF MODULE CHUANKOU
+OBJECT MODULE PLACED IN .\chuankou.obj
+COMPILER INVOKED BY: D:\Program Files (x86)\keil\C51\BIN\C51.EXE ..\hardware\chuankou\chuankou.c LARGE OPTIMIZE(8,SPEED)
+                    - BROWSE INCDIR(..\hardware\chuankou;..\hardware\dongtai;..\hardware\flash;..\hardware\huanjing;..\hardware\led_key;..\ha
+                    -rdware\paint;..\hardware\ruqing;..\hardware\touch_main;..\hardware\yaokong;..\hardware\zitai;..\main;..\system\bin;..\sy
+                    -stem\delay;..\system\iic;..\system\interrupt;..\system\spi;..\system\stc;..\tft_touch_sd\font;..\tft_touch_sd\touch;..\t
+                    -ft_touch_sd\tft;..\tft_touch_sd\txt;..\hardware\peizhi;..\hardware\communicat;..\hardware\phonebook) DEBUG OBJECTEXTEND 
+                    -PRINT(.\chuankou.lst) TABS(2) OBJECT(.\chuankou.obj)
+
+line level    source
+
+   1          #include "STC15F2K60S2.h"
+   2          #include "tft.h"
+   3          #include "bin.h"
+   4          #include "txt.h"
+   5          #include "touch.h"
+   6          #include "string.h"
+   7          #include "chuankou.h"
+   8          #include "font.h"
+   9          #include "delay.h"
+  10          #include "touch_main.h"
+  11          
+  12          unsigned char OKFlag=0;
+  13          unsigned char LXSZFlag=0;   //来电显示设置
+  14          unsigned char CIDFlag=0,CIDFlag1=0;    //Caller Identification  来电显示
+  15          unsigned char RINGFlag=0; //电话呼入
+  16          
+  17          extern unsigned char ldnum[12];   //用于存在3G模块传回信息中的来电号码
+  18          /**
+  19            chuankou.c功能
+  20            串口1：ZIGBEE,P14(扩展zigbee蓝牙模块)
+  21            串口2：串口wifi-esp8266,max3232,OBD
+  22          */
+  23          
+  24          
+  25          //串口2
+  26          sbit CK_TXD = P1^0;  //输入
+  27          sbit CK_RXD = P1^1;
+  28          //串口1
+  29          sbit UTXD = P3^0; //输入
+  30          sbit URXD = P3^1;
+  31          bit cktflg1=0;
+  32          unsigned char CKShowXNum1=2,CKShowYNum1=6,CKShowXNum2=16,CKShowYNum2=6; //串口显示区域的初始位置
+  33          
+  34          volatile unsigned char GetFlag1=0,GetFlag2=0;
+  35          volatile unsigned char BUSY1=0,BUSY2=0; 
+  36          unsigned char CK1Num=0,CK2Num=0;  
+  37          volatile unsigned char GetDataBuf1[100]='\0',GetDataBuf2[100]='\0';
+  38          
+  39          void ChuankouIOInit(void)
+  40          {
+  41   1      P1M0 &=~(1<<0); //输入
+  42   1      P1M1 |=(1<<0); //输入
+  43   1      
+  44   1      P3M0 &=~(1<<0); //输入
+  45   1      P3M1 |=(1<<0); //输入
+  46   1      
+  47   1      P1M0 |=(1<<1); 
+  48   1      P1M1 &=~(1<<1); 
+  49   1      
+  50   1      P3M0 |=(1<<1);
+C51 COMPILER V9.54   CHUANKOU                                                              01/09/2019 14:30:03 PAGE 2   
+
+  51   1      P3M1 &=~(1<<1);
+  52   1      }
+  53          
+  54          void USART1_Init(void)
+  55          {
+  56   1        SCON = 0X50;//01010000：01工作方式1（即8位UART，波特率可变），01允许串行接收
+  57   1        T2L=(65536-(F_CPU)/BAUD/4);//设置波特率重装值
+  58   1        T2H=(65536-(F_CPU)/BAUD/4)>>8;
+  59   1        AUXR |= 0X15;  //定时器T2为波特率发生器，T2为1T模式，启动定时器2
+  60   1        ES =1; //串口1中断开
+  61   1        EA =1;//开总中断
+  62   1      }
+  63          void USART2_Init(void)
+  64          {
+  65   1        S2CON = 0X50;//01010000：01工作方式1（即8位UART，波特率可变），01允许串行接收
+  66   1        T2L=(65536-(F_CPU)/BAUD/4);//设置波特率重装值
+  67   1        T2H=(65536-(F_CPU)/BAUD/4)>>8;
+  68   1        AUXR |= 0X15;  //定时器T2为波特率发生器，T2为1T模式，启动定时器2
+  69   1        IE2 |=(1<<0);     //串口2中断开
+  70   1        EA =1;//开总中断
+  71   1      }
+  72          
+  73          
+  74          void SendData1(unsigned char dat)
+  75          {
+  76   1        while(BUSY1);
+  77   1        SBUF = dat;
+  78   1        BUSY1 =1;    
+  79   1      }
+  80          void SendData2(unsigned char dat)
+  81          {
+  82   1        while(BUSY2);
+  83   1        S2BUF = dat;
+  84   1        BUSY2 =1;    
+  85   1      }
+  86          void SendStr1(unsigned char *s1)
+  87          {
+  88   1        while(*s1)
+  89   1        {
+  90   2          SendData1(*s1++);
+  91   2        }
+  92   1      }
+  93          void SendStr2(unsigned char *s2)
+  94          {
+  95   1        while(*s2)
+  96   1        {
+  97   2          SendData2(*s2++);
+  98   2        }
+  99   1      }
+ 100          
+ 101          void ChuankouMFrame(void)
+ 102          {
+ 103   1        TFT_ClearArea(0,16,240,320-16,WHITE);
+ 104   1        
+ 105   1        LCD_DrawBox(4,300,118,20,RED);
+ 106   1        TFT_ShowString_W25(3,19,2,"配置完成",WHITE,RED);
+ 107   1         
+ 108   1        LCD_DrawRectangle(128, 30,238, 296,WHITE);
+ 109   1        LCD_DrawRectangle(8,60, 125, 292,BLACK);  //数据返回区
+ 110   1        TFT_ClearArea(9,61,115,230,CYAN);
+ 111   1      } 
+ 112          /*
+C51 COMPILER V9.54   CHUANKOU                                                              01/09/2019 14:30:03 PAGE 3   
+
+ 113          0表示串口1关
+ 114          1表示串口1开
+ 115          */
+ 116          void CHK1ButtonFrame(unsigned char a)
+ 117          {
+ 118   1      if(a==0) //串口1 OFF
+ 119   1      {
+ 120   2        TFT_ClearArea(20,20,85,45,WHITE);      //6*8-13, 3*16-13,3*1+26,16+26
+ 121   2        TFT_ClearArea(20+5,20+5,85-10,45-10,BROWN);
+ 122   2        TFT_ClearArea(20+5+4,20+5+4,85-10-8,45-10-8,WHITE);
+ 123   2        TFT_ShowString_W25(5,2,2,"串口1 ",BLUE,WHITE);
+ 124   2         ES =0;//关中断
+ 125   2      }else if(a==1) //串口1  ON
+ 126   1      {
+ 127   2        TFT_ClearArea(20,20,85,45,WHITE);      //6*8-13, 3*16-13,3*1+26,16+26
+ 128   2        TFT_ClearArea(20+5,20+5,85-10,45-10,RED);
+ 129   2        TFT_ClearArea(20+5+4,20+5+4,85-10-8,45-10-8,WHITE);
+ 130   2        TFT_ShowString_W25(5,2,2,"串口1 ",RED,WHITE);
+ 131   2        ES =1;//开中断
+ 132   2      }
+ 133   1      }
+ 134          
+ 135          void CHK2ButtonFrame(void)
+ 136          {
+ 137   1        LCD_DrawRectangle(140,38,230,74,BLACK);
+ 138   1        TFT_ShowString_W25(19,3,2,"查询时间",BLUE,WHITE);
+ 139   1        LCD_DrawRectangle(140,86,230,122,BLACK);
+ 140   1        TFT_ShowString_W25(19,6,2,"强制入网",BLUE,WHITE);
+ 141   1        LCD_DrawRectangle(140,134,230,170,BLACK);
+ 142   1        TFT_ShowString_W25(19,9,2,"信号质量",BLUE,WHITE);
+ 143   1        LCD_DrawRectangle(140,182,230,218,BLACK);
+ 144   1        TFT_ShowString_W25(19,12,2,"来电显示",BLUE,WHITE);
+ 145   1        LCD_DrawRectangle(140,230,230,266,BLACK);
+ 146   1        TFT_ShowString_W25(19,15,2,"一键配置",BLUE,WHITE);
+ 147   1      }
+ 148          
+ 149          void peizhiTouch(void)
+ 150          {
+ 151   1        unsigned char i;
+ 152   1        ChuankouIOInit();
+ 153   1        ChuankouMFrame();
+ 154   1        CHK1ButtonFrame(0);
+ 155   1        CHK2ButtonFrame();
+ 156   1        USART1_Init();
+ 157   1        USART2_Init();
+ 158   1        cktflg1=1;     //保证进入配置界面的时候，串口区域不直接显示信息，只有打开串口按钮后，才会显示信息
+ 159   1        while(1)
+ 160   1        {
+ 161   2          laidian(); 
+ 162   2          if(!Touch_IRQ())
+ 163   2          {
+ 164   3            if(Convert_Pos()) //得到坐标值
+ 165   3            {
+ 166   4              if(tp_pixlcd.y>300 && tp_pixlcd.y<320)  //判断触摸位置为下标签栏"配置完成"
+ 167   4              {
+ 168   5                if(tp_pixlcd.x>4 && tp_pixlcd.x<122)
+ 169   5                  {
+ 170   6                    MainTouch();
+ 171   6                    break;
+ 172   6                  }
+ 173   5              }
+ 174   4              else if(tp_pixlcd.y<52&&tp_pixlcd.y>28)        
+C51 COMPILER V9.54   CHUANKOU                                                              01/09/2019 14:30:03 PAGE 4   
+
+ 175   4              {
+ 176   5                if(tp_pixlcd.x<64&&tp_pixlcd.x>35)   //串口1 
+ 177   5                {
+ 178   6                  cktflg1=~cktflg1;
+ 179   6                  if(cktflg1==1)
+ 180   6                  {     
+ 181   7                    while(!Touch_IRQ());      
+ 182   7                    CHK1ButtonFrame(1);
+ 183   7                  } 
+ 184   6                  else 
+ 185   6                  { 
+ 186   7                    while(!Touch_IRQ());
+ 187   7                    CHK1ButtonFrame(0);
+ 188   7                  } 
+ 189   6                  
+ 190   6                } 
+ 191   5              }
+ 192   4              else if(tp_pixlcd.y>38&&tp_pixlcd.y<74)    //查询时间
+ 193   4              {
+ 194   5                if(tp_pixlcd.x<230&&tp_pixlcd.x>140)
+ 195   5                { 
+ 196   6                  LCD_DrawBox(141,39,89,35,GREEN); 
+ 197   6                  while(!Touch_IRQ());
+ 198   6                  LCD_DrawBox(140,38,90,36,WHITE);
+ 199   6                  LCD_DrawRectangle(140,38,230,74,BLACK);
+ 200   6                  TFT_ShowString_W25(19,3,2,"查询时间",BLUE,WHITE);
+ 201   6                  open5();
+ 202   6                } 
+ 203   5              }
+ 204   4              else if(tp_pixlcd.y>86&&tp_pixlcd.y<122)     //强制入网
+ 205   4              {
+ 206   5                if(tp_pixlcd.x<230&&tp_pixlcd.x>140)
+ 207   5                {
+ 208   6                  LCD_DrawBox(141,87,89,35,GREEN); 
+ 209   6                  while(!Touch_IRQ());
+ 210   6                  LCD_DrawBox(140,86,90,36,WHITE); 
+ 211   6                  LCD_DrawRectangle(140,86,230,122,BLACK);
+ 212   6                  TFT_ShowString_W25(19,6,2,"强制入网",BLUE,WHITE);
+ 213   6                  open2(); 
+ 214   6                } 
+ 215   5              }
+ 216   4              else if(tp_pixlcd.y>134&&tp_pixlcd.y<170)    //查询信号质量
+ 217   4              {
+ 218   5                if(tp_pixlcd.x<230&&tp_pixlcd.x>140)
+ 219   5                {
+ 220   6                  LCD_DrawBox(141,135,89,35,GREEN); 
+ 221   6                  while(!Touch_IRQ());
+ 222   6                  LCD_DrawBox(140,134,90,36,WHITE);
+ 223   6                  LCD_DrawRectangle(140,134,230,170,BLACK);
+ 224   6                  TFT_ShowString_W25(19,9,2,"信号质量",BLUE,WHITE);
+ 225   6                  open3();
+ 226   6                }
+ 227   5              }
+ 228   4              else if(tp_pixlcd.y>182&&tp_pixlcd.y<218)   //来电显示
+ 229   4              {
+ 230   5                if(tp_pixlcd.x<230&&tp_pixlcd.x>140)
+ 231   5                {
+ 232   6                  LCD_DrawBox(141,183,89,35,GREEN); 
+ 233   6                  while(!Touch_IRQ());
+ 234   6                  LCD_DrawBox(140,182,90,36,WHITE);
+ 235   6                  LCD_DrawRectangle(140,182,230,218,BLACK);
+ 236   6                  TFT_ShowString_W25(19,12,2,"来电显示",BLUE,WHITE);
+C51 COMPILER V9.54   CHUANKOU                                                              01/09/2019 14:30:03 PAGE 5   
+
+ 237   6                  open4(); 
+ 238   6                  LXSZFlag=1;
+ 239   6      
+ 240   6                }
+ 241   5              }
+ 242   4              else if(tp_pixlcd.y>230&&tp_pixlcd.y<266)   //
+ 243   4              {
+ 244   5                if(tp_pixlcd.x<230&&tp_pixlcd.x>140)
+ 245   5                {
+ 246   6                  LCD_DrawBox(141,231,89,35,GREEN); 
+ 247   6                  while(!Touch_IRQ());
+ 248   6                  LCD_DrawBox(140,230,90,36,WHITE);
+ 249   6                  LCD_DrawRectangle(140,230,230,266,BLACK);
+ 250   6                  TFT_ShowString_W25(19,15,2,"一键配置",BLUE,WHITE);
+ 251   6                  //LCD_DrawBox(141,39,89,35,GREEN);
+ 252   6                  CHK1ButtonFrame(1);           
+ 253   6                  //delayms(1000);
+ 254   6                  //open1();
+ 255   6                  //LCD_DrawBox(140,38,90,36,WHITE);
+ 256   6                  //LCD_DrawRectangle(140,38,230,74,BLACK);
+ 257   6                  //TFT_ShowString_W25(19,3,2,"入网检测",BLUE,WHITE);
+ 258   6                  
+ 259   6                  LCD_DrawBox(141,87,89,35,GREEN);
+ 260   6                  delayms(1000);
+ 261   6                  open2();
+ 262   6                  LCD_DrawBox(140,86,90,36,WHITE); 
+ 263   6                  LCD_DrawRectangle(140,86,230,122,BLACK);
+ 264   6                  TFT_ShowString_W25(19,6,2,"强制入网",BLUE,WHITE);
+ 265   6                  
+ 266   6                  LCD_DrawBox(141,135,89,35,GREEN); 
+ 267   6                  delayms(1000);
+ 268   6                  open3();
+ 269   6                  LCD_DrawBox(140,134,90,36,WHITE);
+ 270   6                  LCD_DrawRectangle(140,134,230,170,BLACK);
+ 271   6                  TFT_ShowString_W25(19,9,2,"信号质量",BLUE,WHITE);
+ 272   6                  
+ 273   6                  LCD_DrawBox(141,183,89,35,GREEN);
+ 274   6                  delayms(1000);
+ 275   6                  open4(); 
+ 276   6                  LCD_DrawBox(140,182,90,36,WHITE);
+ 277   6                  LCD_DrawRectangle(140,182,230,218,BLACK);
+ 278   6                  TFT_ShowString_W25(19,12,2,"来电显示",BLUE,WHITE);
+ 279   6                  LXSZFlag=1;
+ 280   6                }
+ 281   5              }
+ 282   4            }       
+ 283   3          }
+ 284   2      
+ 285   2          //将GPRS模块传回信息显示在屏幕上
+ 286   2          if(CK1Num>0 && cktflg1==1)
+ 287   2          {   
+ 288   3            i=0;
+ 289   3            while(GetDataBuf1[i])
+ 290   3            { 
+ 291   4              if(GetDataBuf1[i]>31)
+ 292   4                TFT_ShowWord(CKShowXNum1*8,CKShowYNum1*16,8,16,ASCII_816[GetDataBuf1[i]-0x20],BLACK,CYAN);
+ 293   4              else if(GetDataBuf1[i]=='\r'){i++;delayms(500); continue; }
+ 294   4              else if(GetDataBuf1[i]=='\n')  CKShowXNum1=13;      
+ 295   4               
+ 296   4              if(++CKShowXNum1>13)
+ 297   4              {
+ 298   5                CKShowXNum1=2;
+C51 COMPILER V9.54   CHUANKOU                                                              01/09/2019 14:30:03 PAGE 6   
+
+ 299   5                if(++CKShowYNum1>17)
+ 300   5                {CKShowYNum1=5;TFT_ClearArea(9,61,115,230,CYAN);}
+ 301   5               }
+ 302   4              if(++i>99) break;
+ 303   4            }
+ 304   3          }
+ 305   2          ES=0;     //串口1中断关
+ 306   2          memset(GetDataBuf1,0,100);CK1Num=0;
+ 307   2          ES=1;      //串口1中断开     
+ 308   2        }
+ 309   1      }
+ 310          
+ 311          void open1()
+ 312          {
+ 313   1         SendStr1("AT+COPS?\r\n");  
+ 314   1         //SendStr1("AT+COPS=?\r\n");  //入网检测
+ 315   1      }
+ 316          
+ 317          void open2()
+ 318          {
+ 319   1         SendStr1("AT+COPS=1,2,46000\r\n");  //入网
+ 320   1      }
+ 321          
+ 322          void open3()
+ 323          {
+ 324   1         SendStr1("AT+CSQ\r\n");   //信号质量
+ 325   1      }
+ 326          
+ 327          void open4()
+ 328          {
+ 329   1        SendStr1("AT+CLIP=1\r\n");  //来电显示
+ 330   1        //SendStr1("AT+COLP=1\r\n");
+ 331   1      }
+ 332          
+ 333          void open5()
+ 334          {
+ 335   1         SendStr1("AT+CCLK?\r\n");     //查询时间
+ 336   1      }
+ 337          
+ 338          /*void open6()
+ 339          {
+ 340          
+ 341             SendStr1("ATH\r\n");    //挂断（供测试用）
+ 342          }*/
+ 343          unsigned char usartNum1=0,usartNum2=0,usartNum3=0;
+ 344          
+ 345          
+ 346          void Uart1_Isr() interrupt 4 //using 0
+ 347          { 
+ 348   1        unsigned char a;
+ 349   1        if(RI)
+ 350   1        {
+ 351   2          RI =0;a=SBUF;
+ 352   2          if(a<128 && a>0)  //只接收字符串,避免乱码
+ 353   2          { 
+ 354   3            if(CK1Num>298){GetDataBuf1[CK1Num]='\0';CK1Num=0;}      
+ 355   3            GetDataBuf1[CK1Num++]=a;
+ 356   3      
+ 357   3            if(a=='R') usartNum1=1;
+ 358   3            else if(a=='I' && usartNum1==1) usartNum1=2;
+ 359   3            else if(a=='N' && usartNum1==2) usartNum1=3;
+ 360   3            else if(a=='G' && usartNum1==3){ usartNum1=0;RINGFlag=1;}
+C51 COMPILER V9.54   CHUANKOU                                                              01/09/2019 14:30:03 PAGE 7   
+
+ 361   3            else usartNum1=0;
+ 362   3            
+ 363   3            if(a=='+') usartNum2=1;
+ 364   3            else if(a=='C' && usartNum2==1) usartNum2=2;
+ 365   3            else if(a=='L' && usartNum2==2) usartNum2=3;
+ 366   3            else if(a=='I' && usartNum2==3) usartNum2=4;
+ 367   3            else if(a=='P' && usartNum2==4){ usartNum2=5;}
+ 368   3            else if(a==':' && usartNum2==5){ usartNum2=0;CIDFlag=1;}
+ 369   3            else usartNum2=0;
+ 370   3            if(CIDFlag==1)        
+ 371   3            {         
+ 372   4              if(a=='\r') return;
+ 373   4              if(a=='\n')
+ 374   4              {         
+ 375   5                CK2Num=0;
+ 376   5                CIDFlag=0;
+ 377   5                ldnum[0]=GetDataBuf2[3];    //这11行为记录下来电的11位电话号码
+ 378   5                ldnum[1]=GetDataBuf2[4];
+ 379   5                ldnum[2]=GetDataBuf2[5];
+ 380   5                ldnum[3]=GetDataBuf2[6];
+ 381   5                ldnum[4]=GetDataBuf2[7];
+ 382   5                ldnum[5]=GetDataBuf2[8];    
+ 383   5                ldnum[6]=GetDataBuf2[9];
+ 384   5                ldnum[7]=GetDataBuf2[10];
+ 385   5                ldnum[8]=GetDataBuf2[11];
+ 386   5                ldnum[9]=GetDataBuf2[12];
+ 387   5                ldnum[10]=GetDataBuf2[13];
+ 388   5                ldnum[11]='\0';
+ 389   5                CIDFlag1=1;
+ 390   5                return;
+ 391   5              }else
+ 392   4              {                  
+ 393   5                GetDataBuf2[CK2Num++]=a;     //从CMT的T开始存，T存在第一个位置
+ 394   5              }         
+ 395   4            }
+ 396   3      
+ 397   3            if(a=='O') usartNum3=1;
+ 398   3            else if(a=='K' && usartNum3==1) {usartNum3=0;OKFlag=1;}
+ 399   3            else usartNum3=0;
+ 400   3          }
+ 401   2        }
+ 402   1        if(TI)
+ 403   1        {
+ 404   2          TI =0;
+ 405   2          BUSY1=0;
+ 406   2        }
+ 407   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   3458    ----
+   CONSTANT SIZE    =    124    ----
+   XDATA SIZE       =    218       8
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =      1    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

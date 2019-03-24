@@ -1,0 +1,133 @@
+C51 COMPILER V9.54   DONGTAI                                                               01/09/2019 09:17:15 PAGE 1   
+
+
+C51 COMPILER V9.54, COMPILATION OF MODULE DONGTAI
+OBJECT MODULE PLACED IN .\dongtai.obj
+COMPILER INVOKED BY: D:\Program Files (x86)\keil\C51\BIN\C51.EXE ..\hardware\dongtai\dongtai.c LARGE OPTIMIZE(8,SPEED) B
+                    -ROWSE INCDIR(..\hardware\chuankou;..\hardware\dongtai;..\hardware\flash;..\hardware\huanjing;..\hardware\led_key;..\hard
+                    -ware\paint;..\hardware\ruqing;..\hardware\touch_main;..\hardware\yaokong;..\hardware\zitai;..\main;..\system\bin;..\syst
+                    -em\delay;..\system\iic;..\system\interrupt;..\system\spi;..\system\stc;..\tft_touch_sd\font;..\tft_touch_sd\touch;..\tft
+                    -_touch_sd\tft;..\tft_touch_sd\txt;..\hardware\peizhi;..\hardware\communicat;..\hardware\phonebook) DEBUG OBJECTEXTEND PR
+                    -INT(.\dongtai.lst) TABS(2) OBJECT(.\dongtai.obj)
+
+line level    source
+
+   1          
+   2          #include "tft.h"
+   3          #include "bin.h"
+   4          #include "txt.h"
+   5          #include "touch.h"
+   6          
+   7          #include "dongtai.h"
+   8          #include  "led_key.h"
+   9          
+  10          /**
+  11            dongtai.c功能
+  12           震动传感CG_ZDO ；
+  13           红外避障CG_BZO ；
+  14          */
+  15          #include "STC15F2K60S2.h"
+  16          
+  17          sbit CG_ZDO = P3^3;  //输入 高电平有效
+  18          sbit CG_BZO = P3^6;  //输入 低电平有效
+  19          
+  20          void DongtaiIOInit(void)
+  21          {
+  22   1      P3M0 &=~(1<<2); //输入
+  23   1      P3M1 |=(1<<2); //输入
+  24   1      
+  25   1      P3M0 &=~(1<<3); //输入
+  26   1      P3M1 |=(1<<3); //输入
+  27   1      
+  28   1      P3M0 &=~(1<<6); //输入
+  29   1      P3M1 |=(1<<6); //输入
+  30   1      
+  31   1      P4M0 |=(1<<1);
+  32   1      P4M1 &=~(1<<1);
+  33   1      LedKeyInit();
+  34   1      }
+  35          void DongtaiMFrame(void)
+  36          {
+  37   1        TFT_ClearArea(0,16,240,320-16,LIGHTBLUE);
+  38   1        TFT_ClearONELINE(19,BLUE);
+  39   1          TFT_ShowString_W25(0,19,2,"主界面",WHITE,RED);
+  40   1      }
+  41          /*0表示关，1表示开*/
+  42          void ZDFrame(unsigned char a)
+  43          {
+  44   1      
+  45   1      if(a==0) // OFF
+  46   1      {
+  47   2        TFT_ClearArea(55,75,112,53,WHITE);
+  48   2        TFT_ClearArea(55+5,75+5,112-10,53-10,BROWN);
+  49   2        TFT_ClearArea(55+5+2,75+5+2,98,39,WHITE);
+  50   2        TFT_ShowString_W25(10,6,2,"震动检测",BROWN,WHITE);
+C51 COMPILER V9.54   DONGTAI                                                               01/09/2019 09:17:15 PAGE 2   
+
+  51   2      
+  52   2      }else if(a==1) //  ON
+  53   1      {
+  54   2        TFT_ClearArea(55,75,112,53,WHITE);
+  55   2        TFT_ClearArea(55+5,75+5,112-10,53-10,RED);
+  56   2        TFT_ClearArea(62,75+5+2,98,39,WHITE);
+  57   2        TFT_ShowString_W25(10,6,2,"震动检测",RED,WHITE);
+  58   2      }
+  59   1      }
+  60          /*0表示关，1表示开*/
+  61          void HWBZFrame(unsigned char a)
+  62          {
+  63   1      if(a==0) // OFF
+  64   1      {
+  65   2        TFT_ClearArea(55,170,112,53,WHITE);
+  66   2        TFT_ClearArea(55+5,170+5,112-10,53-10,BROWN);
+  67   2        TFT_ClearArea(62,170+5+2,98,39,WHITE);
+  68   2        TFT_ShowString_W25(10,12,2,"障碍检测",BROWN,WHITE);
+  69   2      }else if(a==1) // ON
+  70   1      {
+  71   2        TFT_ClearArea(55,170,112,53,WHITE);
+  72   2        TFT_ClearArea(55+5,170+5,112-10,53-10,RED);
+  73   2        TFT_ClearArea(62,170+5+2,98,39,WHITE);
+  74   2        TFT_ShowString_W25(10,12,2,"障碍检测",RED,WHITE);
+  75   2      }
+  76   1      }
+  77          
+  78          void DongtJiancTouch(void)
+  79          {
+  80   1      
+  81   1          DongtaiMFrame();
+  82   1          DongtaiIOInit();
+  83   1          ZDFrame(0);
+  84   1          HWBZFrame(0);
+  85   1        
+  86   1          while(1)
+  87   1          {
+  88   2          if(!Touch_IRQ()) //有触摸发生
+  89   2          {
+  90   3            if(Convert_Pos()) //得到坐标值
+  91   3            {
+  92   4              if(tp_pixlcd.x<48&&tp_pixlcd.y>298)   //下标签栏"主界面"
+  93   4              {LED3_OFF();LED4_OFF();return;}
+  94   4             }
+  95   3           }
+  96   2           if(CG_ZDO==1){LED3_ON();/*ZDFrame(1);*/}
+  97   2           else {LED3_OFF();/*ZDFrame(0);*/}
+  98   2           if(CG_BZO==0){LED4_ON();/*HWBZFrame(1);*/}
+  99   2           else {LED4_OFF();/*HWBZFrame(0);*/}
+ 100   2           }
+ 101   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    718    ----
+   CONSTANT SIZE    =     25    ----
+   XDATA SIZE       =   ----       2
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+C51 COMPILER V9.54   DONGTAI                                                               01/09/2019 09:17:15 PAGE 3   
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

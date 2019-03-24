@@ -1,0 +1,600 @@
+C51 COMPILER V9.54   TFT                                                                   01/09/2019 09:18:14 PAGE 1   
+
+
+C51 COMPILER V9.54, COMPILATION OF MODULE TFT
+OBJECT MODULE PLACED IN .\tft.obj
+COMPILER INVOKED BY: D:\Program Files (x86)\keil\C51\BIN\C51.EXE ..\tft_touch_sd\tft\tft.C LARGE OPTIMIZE(8,SPEED) BROWS
+                    -E INCDIR(..\hardware\chuankou;..\hardware\dongtai;..\hardware\flash;..\hardware\huanjing;..\hardware\led_key;..\hardware
+                    -\paint;..\hardware\ruqing;..\hardware\touch_main;..\hardware\yaokong;..\hardware\zitai;..\main;..\system\bin;..\system\d
+                    -elay;..\system\iic;..\system\interrupt;..\system\spi;..\system\stc;..\tft_touch_sd\font;..\tft_touch_sd\touch;..\tft_tou
+                    -ch_sd\tft;..\tft_touch_sd\txt;..\hardware\peizhi;..\hardware\communicat;..\hardware\phonebook) DEBUG OBJECTEXTEND PRINT(
+                    -.\tft.lst) TABS(2) OBJECT(.\tft.obj)
+
+line level    source
+
+   1          #include "STC15F2K60S2.h"
+   2          #include "string.h"
+   3          #include "font.h"
+   4          #include "delay.h"
+   5          #include "tft.h"
+   6          #include "image.h"
+   7           /*51单片机TFT程序*
+   8           ********************************** ********************
+   9           *51芯片为 STC12 48脚    
+  10           *TFT驱动IC为SSD1289
+  11           ******************************************************
+  12           *TFT接口
+  13            *数据线（输出）： DB0-DB7(低8位),依次连接P2^0-P2^7;
+  14                         DB8-DB15(高8位),依次连接P0^0-P0^7;
+  15            *控制线（输出）：
+  16            P5.2-----------RS
+  17            P5.3-----------WR
+  18            P6.0-----------RD
+  19            P6.4-----------CS
+  20            P6.5-----------REST 
+  21          
+  22           ******************************************************
+  23           *#define HVSCREEN  定义该变量表示是竖屏显示，否则是横屏显示
+  24           */
+  25          
+  26          #define  TFT_DataPortH P0     //高8位数据口,8位模式下只使用高8位 
+  27          #define  TFT_DataPortL P2     //低8位数据口 ,8位模式下低8位可以不接线,请确认P0口已经上拉10K电阻,不宜太小，
+             -最小4.7K,推荐10K.
+  28          
+  29          sbit TFT_RS = P5^2;   //数据1/命令0
+  30          sbit TFT_WR = P5^3;   //写控制
+  31          
+  32          sbit TFT_RD = P6^0;   //读控制Not used and should be connected to VDDIO or Vss
+  33          sbit TFT_CS = P6^4;   //片选，低电平有效  
+  34          sbit TFT_REST = P6^5; //低电平复位 
+  35          
+  36          unsigned char Y_LEN=0;//全局变量用于消息一直往下打印
+  37          /***********总线定义*************/   
+  38          void TFT_Writ_Bus(unsigned char VH,unsigned char VL)   //并行数据写入函数
+  39          {
+  40   1          TFT_DataPortH=VH; 
+  41   1        TFT_DataPortL=VL;   
+  42   1        TFT_WR=0;
+  43   1        TFT_WR=1; 
+  44   1      }
+  45          void TFT_WR_DATA8(unsigned char VH,unsigned char VL)
+  46          {
+  47   1          TFT_RS=1;
+  48   1        TFT_Writ_Bus(VH,VL);
+  49   1      }
+C51 COMPILER V9.54   TFT                                                                   01/09/2019 09:18:14 PAGE 2   
+
+  50          void TFT_WR_DATA(unsigned int da)
+  51          {
+  52   1          TFT_RS=1;
+  53   1        TFT_Writ_Bus(da>>8,da);
+  54   1      }   
+  55          void TFT_WR_REG(unsigned int da)   
+  56          { 
+  57   1          TFT_RS=0;
+  58   1        TFT_Writ_Bus(da>>8,da);
+  59   1      }
+  60           void TFT_WR_REG_DATA(unsigned int reg,unsigned int da)
+  61          {
+  62   1          TFT_WR_REG(reg);
+  63   1        TFT_WR_DATA(da);
+  64   1      }
+  65          /* 函数说明：x1,y1为起始点的坐标；x2,y2为结束点的坐标；
+  66          (0,0)x1,y1-------------x2,y1(239,0)
+  67             |           |
+  68             |               |
+  69             |           |
+  70             |           |
+  71             |           |
+  72             |           |
+  73             |           |
+  74             |           |
+  75             |           |
+  76             |           |
+  77             |           |
+  78             |           |
+  79             |           |
+  80             x1,y2-------------x2,y2
+  81            (0,319)     (239,319)
+  82            函数功能：设置显示区域 显示器竖屏
+  83            R44hRAM地址：水平显示方向的起始(x1低8位)/终点(x2高8位)范围,0x00<=x1<=x2<=0xef(239) 即水平240个点
+  84            R45h-R46hRAM地址：垂直显示方向的起始(y1低8位)/终点(y2低8位)范围,0x00<=y1<=y2<=0x013f(319) 即垂直320个点
+  85            R4eh-R4fhRAM地址：4e为水平地址计数值<=0xef,4f为垂直地址计数值<=0x13f
+  86          
+  87          
+  88            函数功能：设置显示区域显示器横屏(X,Y,对调) 
+  89          (0,0)x1,y1-------------------------x2,y1(319,0)
+  90             |                         |
+  91             |                 |
+  92             |                 |
+  93             |                 |
+  94             |                 |
+  95             x1,y2---------------------------x2,y2
+  96            (0,239)                     (319,239)
+  97          
+  98            R44hRAM地址：水平显示方向的起始(y1低8位)/终点(y2高8位)范围,0x00<=y1<=y2<=0xef(239) 即240个点
+  99            R45h-R46hRAM地址：垂直显示方向的起始(x1低8位)/终点(x2低8位)范围,0x00<=x1<=x2<=0x013f(319)即320个点
+ 100            R4eh-R4fhRAM地址：4e为水平地址计数值<=0xef,4f为垂直地址计数值<=0x13f
+ 101          */
+ 102          void TFT_AddressSet(unsigned int x1,unsigned int y1,unsigned int x2,unsigned int y2) 
+ 103          { 
+ 104   1         TFT_WR_REG(0x2A);
+ 105   1         TFT_WR_DATA(x1>>8);
+ 106   1         TFT_WR_DATA(x1);
+ 107   1         TFT_WR_DATA(x2>>8);
+ 108   1         TFT_WR_DATA(x2);
+ 109   1        
+ 110   1         TFT_WR_REG(0x2B);
+ 111   1         TFT_WR_DATA(y1>>8);
+C51 COMPILER V9.54   TFT                                                                   01/09/2019 09:18:14 PAGE 3   
+
+ 112   1         TFT_WR_DATA(y1);
+ 113   1         TFT_WR_DATA(y2>>8);
+ 114   1         TFT_WR_DATA(y2); 
+ 115   1         TFT_WR_REG(0x2c);            
+ 116   1        
+ 117   1        
+ 118   1      //    TFT_WR_REG_DATA(0x0044,(x2<<8)+x1);
+ 119   1      //    TFT_WR_REG_DATA(0x0045,y1);
+ 120   1      //    TFT_WR_REG_DATA(0x0046,y2);
+ 121   1      //    TFT_WR_REG_DATA(0x004e,x1);
+ 122   1      //    TFT_WR_REG_DATA(0x004f,y1); 
+ 123   1      
+ 124   1      //      TFT_WR_REG(0x0022);  //Write Data to GRAM 
+ 125   1      }
+ 126          
+ 127          void TFT_ClearByColor(unsigned int Color)
+ 128          {
+ 129   1        unsigned long i;      
+ 130   1        TFT_AddressSet(0,0,239,319); 
+ 131   1          for(i=0;i<76800;i++)
+ 132   1        {
+ 133   2           TFT_WR_DATA(Color);
+ 134   2        }
+ 135   1      }
+ 136           /* 清除某个区域*/
+ 137          void TFT_ClearArea(unsigned int start_x,unsigned int start_y,unsigned int x_size,unsigned int y_size,unsig
+             -ned int Color)
+ 138          {
+ 139   1        unsigned long i;      
+ 140   1        TFT_AddressSet(start_x,start_y,start_x+x_size-1,start_y+y_size-1); 
+ 141   1          for(i=0;i<(unsigned long)x_size*y_size;i++)
+ 142   1        {
+ 143   2           TFT_WR_DATA(Color);
+ 144   2        }
+ 145   1      }
+ 146          
+ 147          //横屏n<240/16=15行，竖屏n<320/16=20行
+ 148          void TFT_ClearONELINE(unsigned int n,unsigned int Color)
+ 149          {
+ 150   1        unsigned long i;      
+ 151   1        TFT_AddressSet(0,n*16,239,n*16+15);
+ 152   1        for(i=0;i<16*240;i++)
+ 153   1        {
+ 154   2           TFT_WR_DATA(Color);
+ 155   2        } 
+ 156   1      }
+ 157          
+ 158          /*
+ 159            函数功能：初始化TFT
+ 160          */
+ 161          void TFT_IO_INIT(void)
+ 162          {
+ 163   1        P0M0=0XFF;
+ 164   1        P0M1=0X00;
+ 165   1        P1M0=0XFF;
+ 166   1        P1M1=0X00;
+ 167   1      
+ 168   1        P2M0 |=(1<<0)|(1<<1)|(1<<2)|(1<<7);
+ 169   1        P2M1 &=~((1<<0)|(1<<1)|(1<<2)|(1<<7));
+ 170   1      
+ 171   1        P3M0 |=(1<<7) ;
+ 172   1        P3M1 &=~(1<<7);
+C51 COMPILER V9.54   TFT                                                                   01/09/2019 09:18:14 PAGE 4   
+
+ 173   1      }
+ 174          void TFT_Init(void) 
+ 175          {
+ 176   1        TFT_IO_INIT();
+ 177   1        TFT_REST=0;delayms(5);//低电平复位
+ 178   1        TFT_REST=1;
+ 179   1      
+ 180   1        TFT_CS=1;TFT_RD=1;TFT_WR=1; delayms(5);
+ 181   1        TFT_CS =0;  //打开片选使能
+ 182   1      
+ 183   1       //************* Start Initial Sequence **********//
+ 184   1      TFT_WR_REG(0xcf); 
+ 185   1      TFT_WR_DATA(0x00);
+ 186   1      TFT_WR_DATA(0xc1);
+ 187   1      TFT_WR_DATA(0x30);
+ 188   1      
+ 189   1      TFT_WR_REG(0xed); 
+ 190   1      TFT_WR_DATA(0x64);
+ 191   1      TFT_WR_DATA(0x03);
+ 192   1      TFT_WR_DATA(0x12);
+ 193   1      TFT_WR_DATA(0x81);
+ 194   1      
+ 195   1      TFT_WR_REG(0xcb); 
+ 196   1      TFT_WR_DATA(0x39);
+ 197   1      TFT_WR_DATA(0x2c);
+ 198   1      TFT_WR_DATA(0x00);
+ 199   1      TFT_WR_DATA(0x34);
+ 200   1      TFT_WR_DATA(0x02);
+ 201   1      
+ 202   1      TFT_WR_REG(0xea); 
+ 203   1      TFT_WR_DATA(0x00);
+ 204   1      TFT_WR_DATA(0x00);
+ 205   1      
+ 206   1      TFT_WR_REG(0xe8); 
+ 207   1      TFT_WR_DATA(0x85);
+ 208   1      TFT_WR_DATA(0x10);
+ 209   1      TFT_WR_DATA(0x79);
+ 210   1      
+ 211   1      TFT_WR_REG(0xC0); //Power control
+ 212   1      TFT_WR_DATA(0x23); //VRH[5:0]
+ 213   1      
+ 214   1      TFT_WR_REG(0xC1); //Power control
+ 215   1      TFT_WR_DATA(0x11); //SAP[2:0];BT[3:0]
+ 216   1      
+ 217   1      TFT_WR_REG(0xC2);
+ 218   1      TFT_WR_DATA(0x11);
+ 219   1      
+ 220   1      TFT_WR_REG(0xC5); //VCM control
+ 221   1      TFT_WR_DATA(0x3d);
+ 222   1      TFT_WR_DATA(0x30);
+ 223   1      
+ 224   1      TFT_WR_REG(0xc7); 
+ 225   1      TFT_WR_DATA(0xaa);
+ 226   1      
+ 227   1      TFT_WR_REG(0x3A); 
+ 228   1      TFT_WR_DATA(0x55);
+ 229   1      
+ 230   1      TFT_WR_REG(0x36); // Memory Access Control
+ 231   1      TFT_WR_DATA(0x08);
+ 232   1      
+ 233   1      TFT_WR_REG(0xB1); // Frame Rate Control
+ 234   1      TFT_WR_DATA(0x00);
+C51 COMPILER V9.54   TFT                                                                   01/09/2019 09:18:14 PAGE 5   
+
+ 235   1      TFT_WR_DATA(0x11);
+ 236   1      
+ 237   1      TFT_WR_REG(0xB6); // Display Function Control
+ 238   1      TFT_WR_DATA(0x0a);
+ 239   1      TFT_WR_DATA(0xa2);
+ 240   1      
+ 241   1      TFT_WR_REG(0xF2); // 3Gamma Function Disable
+ 242   1      TFT_WR_DATA(0x00);
+ 243   1      
+ 244   1      TFT_WR_REG(0xF7);
+ 245   1      TFT_WR_DATA(0x20);
+ 246   1      
+ 247   1      TFT_WR_REG(0xF1);
+ 248   1      TFT_WR_DATA(0x01);
+ 249   1      TFT_WR_DATA(0x30);
+ 250   1      
+ 251   1      TFT_WR_REG(0x26); //Gamma curve selected
+ 252   1      TFT_WR_DATA(0x01);
+ 253   1      
+ 254   1      TFT_WR_REG(0xE0); //Set Gamma
+ 255   1      TFT_WR_DATA(0x0f);
+ 256   1      TFT_WR_DATA(0x3f);
+ 257   1      TFT_WR_DATA(0x2f);
+ 258   1      TFT_WR_DATA(0x0c);
+ 259   1      TFT_WR_DATA(0x10);
+ 260   1      TFT_WR_DATA(0x0a);
+ 261   1      TFT_WR_DATA(0x53);
+ 262   1      TFT_WR_DATA(0xd5);
+ 263   1      TFT_WR_DATA(0x40);
+ 264   1      TFT_WR_DATA(0x0a);
+ 265   1      TFT_WR_DATA(0x13);
+ 266   1      TFT_WR_DATA(0x03);
+ 267   1      TFT_WR_DATA(0x08);
+ 268   1      TFT_WR_DATA(0x03);
+ 269   1      TFT_WR_DATA(0x00);
+ 270   1      
+ 271   1      TFT_WR_REG(0xE1); //Set Gamma
+ 272   1      TFT_WR_DATA(0x00);
+ 273   1      TFT_WR_DATA(0x00);
+ 274   1      TFT_WR_DATA(0x10);
+ 275   1      TFT_WR_DATA(0x03);
+ 276   1      TFT_WR_DATA(0x0f);
+ 277   1      TFT_WR_DATA(0x05);
+ 278   1      TFT_WR_DATA(0x2c);
+ 279   1      TFT_WR_DATA(0xa2);
+ 280   1      TFT_WR_DATA(0x3f);
+ 281   1      TFT_WR_DATA(0x05);
+ 282   1      TFT_WR_DATA(0x0e);
+ 283   1      TFT_WR_DATA(0x0c);
+ 284   1      TFT_WR_DATA(0x37);
+ 285   1      TFT_WR_DATA(0x3c);
+ 286   1      TFT_WR_DATA(0x0F);
+ 287   1      TFT_WR_REG(0x11); //Exit Sleep
+ 288   1      delayms(80);//此处必须要延时80ms或者更多
+ 289   1      TFT_WR_REG(0x29); //display on
+ 290   1        
+ 291   1        
+ 292   1      //  TFT_WR_REG_DATA(0x0000,0x0001);      //打开晶振
+ 293   1      //    TFT_WR_REG_DATA(0x0003,0xA8A4);      //0xA8A4
+ 294   1      //    TFT_WR_REG_DATA(0x000C,0x0000);       
+ 295   1      //    TFT_WR_REG_DATA(0x000D,0x080C);      
+ 296   1      //    TFT_WR_REG_DATA(0x000E,0x2B00);     
+C51 COMPILER V9.54   TFT                                                                   01/09/2019 09:18:14 PAGE 6   
+
+ 297   1      //    TFT_WR_REG_DATA(0x001E,0x00B7);       
+ 298   1      //    TFT_WR_REG_DATA(0x0001,0x2B3F);      //驱动输出控制320*240  0x6B3F
+ 299   1      
+ 300   1      //    TFT_WR_REG_DATA(0x0002,0x0600);   
+ 301   1      //    TFT_WR_REG_DATA(0x0010,0x0000);  
+ 302   1      
+ 303   1      //#ifdef HVSCREEN       //竖屏  16位色 
+ 304   1      ////   TFT_WR_REG_DATA(0x0011,0x6838);  //全屏显示320*240视频时配置（此时汉字不能显示）,自上而下,从左到右
+ 305   1      //    TFT_WR_REG_DATA(0x0011,0x6830);    //显示字符、汉字、视频（宽度小于240）时配置,从左到右 ,自上而下   
+ 306   1      //#else           //宽屏  16位色 
+ 307   1      //   TFT_WR_REG_DATA(0x0011,0x6818);  //目前显示字符、汉字、视频都可以,自下而上,从左到右 
+ 308   1      //#endif
+ 309   1      //        
+ 310   1      //    TFT_WR_REG_DATA(0x0005,0x0000);    
+ 311   1      //    TFT_WR_REG_DATA(0x0006,0x0000);    
+ 312   1      //    TFT_WR_REG_DATA(0x0016,0xEF1C);    
+ 313   1      //    TFT_WR_REG_DATA(0x0017,0x0003);    
+ 314   1      //    TFT_WR_REG_DATA(0x0007,0x0233);            //0x0233       
+ 315   1      //    TFT_WR_REG_DATA(0x000B,0x0000);    
+ 316   1      //    TFT_WR_REG_DATA(0x000F,0x0000);            //扫描开始地址
+ 317   1      //    TFT_WR_REG_DATA(0x0041,0x0000);    
+ 318   1      //    TFT_WR_REG_DATA(0x0042,0x0000);    
+ 319   1      //    TFT_WR_REG_DATA(0x0048,0x0000);    
+ 320   1      //    TFT_WR_REG_DATA(0x0049,0x013F);    
+ 321   1      //    TFT_WR_REG_DATA(0x004A,0x0000);    
+ 322   1      //    TFT_WR_REG_DATA(0x004B,0x0000);    
+ 323   1      //    TFT_WR_REG_DATA(0x0044,0xEF00);    
+ 324   1      //    TFT_WR_REG_DATA(0x0045,0x0000);    
+ 325   1      //    TFT_WR_REG_DATA(0x0046,0x013F);    
+ 326   1      //    TFT_WR_REG_DATA(0x0030,0x0707);    
+ 327   1      //    TFT_WR_REG_DATA(0x0031,0x0204);    
+ 328   1      //    TFT_WR_REG_DATA(0x0032,0x0204);    
+ 329   1      //    TFT_WR_REG_DATA(0x0033,0x0502);    
+ 330   1      //    TFT_WR_REG_DATA(0x0034,0x0507);    
+ 331   1      //    TFT_WR_REG_DATA(0x0035,0x0204);    
+ 332   1      //    TFT_WR_REG_DATA(0x0036,0x0204);    
+ 333   1      //    TFT_WR_REG_DATA(0x0037,0x0502);    
+ 334   1      //    TFT_WR_REG_DATA(0x003A,0x0302);    
+ 335   1      //    TFT_WR_REG_DATA(0x003B,0x0302);    
+ 336   1      //    TFT_WR_REG_DATA(0x0023,0x0000);    
+ 337   1      //    TFT_WR_REG_DATA(0x0024,0x0000);    
+ 338   1      //    TFT_WR_REG_DATA(0x0025,0x8000);    
+ 339   1        TFT_ClearByColor(BACK_COLOR);
+ 340   1      }
+ 341          /*******************************************显示字符功能函数区********************************************
+             -*************************/
+ 342          /*
+ 343            函数功能：指定位置显示任意大小的字符(可以是汉字) 默认字符为8*16，汉字为16*16
+ 344            x,y:起始字符的行列，x<30列宽为8的字符,y<20行高为16的字符
+ 345            size_x,size_y:字体的大小
+ 346            PColor为内容颜色，BColor为背静颜色
+ 347          */
+ 348          void TFT_ShowWord(unsigned int x,unsigned int y,unsigned int size_x,unsigned int size_y,unsigned char *tem
+             -p,unsigned int PColor,unsigned int BColor)  
+ 349          {  
+ 350   1        unsigned char i,j;
+ 351   1        TFT_AddressSet(x,y,x+size_x-1,y+size_y-1); //设置区域 
+ 352   1        
+ 353   1        for(j=0;j<size_x*size_y/8;j++)    //如果字符为16个数组，如果为汉字为32个数组
+ 354   1        {
+ 355   2          for(i=8;i>0;i--)      //高位在前，低位在后，取字模时匹配就OK
+ 356   2          {          
+C51 COMPILER V9.54   TFT                                                                   01/09/2019 09:18:14 PAGE 7   
+
+ 357   3            if((*temp&(1<<(i-1)))>0)  //最高位为左移7位
+ 358   3            {
+ 359   4              TFT_WR_DATA(PColor);  //对应于取字模时的阴码
+ 360   4            } 
+ 361   3            else
+ 362   3            {
+ 363   4              TFT_WR_DATA(BColor);
+ 364   4            }   
+ 365   3          }
+ 366   2          temp++;
+ 367   2         }
+ 368   1      }
+ 369          /*
+ 370            函数功能：指定位置显示显示字符串  默认字符为8*16，汉字为16*16
+ 371            x,y:起始字符的行列:竖屏x<30列(240/8) y<20行(320/16);宽屏x<30列(320/8=40) y<15行(240/16)
+ 372            *ptr:显示内容
+ 373            PenColor为内容颜色，BackColor为背静颜色
+ 374          */
+ 375          void TFT_ShowString(unsigned int x,unsigned int y,unsigned char *ptr,unsigned int PenColor,unsigned int Ba
+             -ckColor)
+ 376          {         
+ 377   1        unsigned char i,j,val=0; //一定要初始化，不然xlen在第二次调用时会有问题
+ 378   1      
+ 379   1        unsigned char temp[2];
+ 380   1        unsigned char xlen;
+ 381   1        unsigned char ylen; 
+ 382   1          unsigned char max_ylen;unsigned char max_xlen;
+ 383   1      #ifdef HVSCREEN       //竖屏   
+ 384   1          max_xlen=30;max_ylen=20;        //最多显示240/8=30列 320/16=20行 
+ 385   1      #else           //宽屏  
+                  max_xlen=40;max_ylen=15;        //最多显示320/8=40列 240/16=15行        
+              #endif
+ 388   1        for(i=0;i<strlen(ptr);i++)
+ 389   1        {
+ 390   2          temp[0]=ptr[i];
+ 391   2          temp[1]=ptr[i+1];
+ 392   2          
+ 393   2          xlen =(x+i+val)%max_xlen;         
+ 394   2          ylen =((x+i+val)/max_xlen+y)%max_ylen;  
+ 395   2      //    if(xlen==0 && ylen ==0)
+ 396   2      //      TFT_ClearByColor(BACK_COLOR);
+ 397   2      
+ 398   2          if(temp[0]<128)   //为ASCII码
+ 399   2            TFT_ShowWord(xlen*8,ylen*16,8,16,ASCII_816[temp[0]-0x20],PenColor,BackColor); //ASCII码前32个字库未录入
+             -temp[0]-0x20)，每个字符16个
+ 400   2          else         //为汉字
+ 401   2            {
+ 402   3            if(xlen==max_xlen-1)   //最后一列不能放下一个汉字
+ 403   3            {
+ 404   4              TFT_ShowWord(xlen*8,ylen*16,8,16,ASCII_816[0],PenColor,BackColor);  //显示“ ”空白填补
+ 405   4              val++;  
+ 406   4              i--;//指针还是指向原汉字,所以要减一     
+ 407   4            }
+ 408   3            else
+ 409   3            {
+ 410   4              for(j=0;j<sizeof(GB16)/35;j++)   //查找汉字库，34字节一个字符
+ 411   4              {
+ 412   5                if((temp[0]==GB16[j].Index[0])&&(temp[1]==GB16[j].Index[1]))//找到需要的汉字字节
+ 413   5                {
+ 414   6                  break;
+ 415   6                }
+ 416   5              }
+C51 COMPILER V9.54   TFT                                                                   01/09/2019 09:18:14 PAGE 8   
+
+ 417   4              if(j<sizeof(GB16)/35)         
+ 418   4              TFT_ShowWord(xlen*8,ylen*16,16,16,&GB16[j].MSK,PenColor,BackColor); 
+ 419   4              i++;
+ 420   4            }
+ 421   3           }
+ 422   2        }
+ 423   1        Y_LEN = ylen+1; //记录下用到的行数+下一行
+ 424   1        Y_LEN %=max_ylen;
+ 425   1      }
+ 426          
+ 427          /*******************************************显示图片功能函数区********************************************
+             -*************************/ 
+ 428          
+ 429          //n为像素大小>0
+ 430          //POINT_COLOR:此点的颜色   
+ 431          void LCD_DrawPoint_big(unsigned int x,unsigned int y,unsigned char n,unsigned int Pen_Color)
+ 432          {
+ 433   1        unsigned char i;
+ 434   1        if(n>0)
+ 435   1        {
+ 436   2          TFT_AddressSet(x,y,x+n-1,y+n-1);//设置光标位置 
+ 437   2          for(i=0;i<n*n;i++)
+ 438   2          TFT_WR_DATA(Pen_Color); 
+ 439   2        }
+ 440   1      }
+ 441          //画线
+ 442          //x1,y1:起点坐标
+ 443          //x2,y2:终点坐标  
+ 444          void LCD_DrawLine(unsigned int x1,unsigned int y1,unsigned int x2,unsigned int y2,unsigned int Pen_Color)
+ 445          {
+ 446   1        unsigned int t; 
+ 447   1        int xerr=0,yerr=0,dx,dy,distance; 
+ 448   1        int incx,incy,uRow,uCol; 
+ 449   1      
+ 450   1        dx=x2-x1; //计算坐标增量 
+ 451   1        dy=y2-y1; 
+ 452   1        
+ 453   1        uRow=x1; 
+ 454   1        uCol=y1; 
+ 455   1      
+ 456   1        if(dx>0)incx=1; //设置单步方向 
+ 457   1        else if(dy==0)incx=0;//垂直线 
+ 458   1        else {incx=-1;dx=-dx;} 
+ 459   1      
+ 460   1        if(dy>0)incy=1; 
+ 461   1        else if(dy==0)incy=0;//水平线 
+ 462   1        else{incy=-1;dy=-dy;} 
+ 463   1      
+ 464   1        if(dx>dy) distance=dx; //选取基本增量坐标轴 
+ 465   1        else distance=dy; 
+ 466   1      
+ 467   1        for(t=0;t<=distance;t++ )//画线输出 
+ 468   1        {  
+ 469   2          LCD_DrawPoint_big(uRow,uCol,1,Pen_Color);//画点 
+ 470   2          xerr+=dx; 
+ 471   2          yerr+=dy; 
+ 472   2          if(xerr>=distance) 
+ 473   2          { 
+ 474   3            xerr-=distance; 
+ 475   3            uRow+=incx; 
+ 476   3          } 
+ 477   2          if(yerr>=distance) 
+C51 COMPILER V9.54   TFT                                                                   01/09/2019 09:18:14 PAGE 9   
+
+ 478   2          { 
+ 479   3            yerr-=distance; 
+ 480   3            uCol+=incy; 
+ 481   3          } 
+ 482   2        }  
+ 483   1      } 
+ 484           
+ 485          //画矩形
+ 486          void LCD_DrawRectangle(unsigned int x1, unsigned int y1, unsigned int x2, unsigned int y2,unsigned int Pen
+             -_Color)
+ 487          {
+ 488   1        LCD_DrawLine(x1,y1,x2,y1,Pen_Color); //上横
+ 489   1        LCD_DrawLine(x1,y1,x1,y2,Pen_Color); //左竖
+ 490   1        LCD_DrawLine(x1,y2,x2,y2,Pen_Color); //下横
+ 491   1        LCD_DrawLine(x2,y1,x2,y2,Pen_Color); //右竖
+ 492   1      }
+ 493          /*********************************************
+ 494          画实心矩形
+ 495          入口参数： (x1,y1)左上角顶点坐标, (x2,y2)右下角顶点坐标, Pen_Color颜色
+ 496          出口参数: 无
+ 497          说明：在指定位置上画出实心矩形。
+ 498          **********************************************/
+ 499          void LCD_DrawBox(unsigned int x, unsigned int y, unsigned int size_x, unsigned int size_y,unsigned int Pen
+             -_Color)
+ 500          { 
+ 501   1        unsigned int i;
+ 502   1        TFT_AddressSet(x,y,x+size_x-1,y+size_y-1);//设置光标位置 
+ 503   1        for(i=0;i<size_x*size_y;i++)
+ 504   1          TFT_WR_DATA(Pen_Color); 
+ 505   1      }
+ 506          //在指定位置画一个指定大小的圆
+ 507          //(x,y):中心点
+ 508          //r    :半径
+ 509          void Draw_Circle(unsigned int x0,unsigned int y0,unsigned int r,unsigned int Pen_Color)
+ 510          {
+ 511   1        int a,b;
+ 512   1        int di;
+ 513   1        a=0;b=r;    
+ 514   1        di=3-(r<<1);             //判断下个点位置的标志
+ 515   1        while(a<=b)
+ 516   1        {
+ 517   2          LCD_DrawPoint_big(x0-b,y0-a,1,Pen_Color);             //3           
+ 518   2          LCD_DrawPoint_big(x0+b,y0-a,1,Pen_Color);             //0           
+ 519   2          LCD_DrawPoint_big(x0-a,y0+b,1,Pen_Color);             //1       
+ 520   2          LCD_DrawPoint_big(x0-b,y0-a,1,Pen_Color);             //7           
+ 521   2          LCD_DrawPoint_big(x0-a,y0-b,1,Pen_Color);             //2             
+ 522   2          LCD_DrawPoint_big(x0+b,y0+a,1,Pen_Color);             //4               
+ 523   2          LCD_DrawPoint_big(x0+a,y0-b,1,Pen_Color);             //5
+ 524   2          LCD_DrawPoint_big(x0+a,y0+b,1,Pen_Color);             //6 
+ 525   2          LCD_DrawPoint_big(x0-b,y0+a,1,Pen_Color);             
+ 526   2          a++;
+ 527   2          //使用Bresenham算法画圆     
+ 528   2          if(di<0)di +=4*a+6;   
+ 529   2          else
+ 530   2          {
+ 531   3            di+=10+4*(a-b);   
+ 532   3            b--;
+ 533   3          } 
+ 534   2          LCD_DrawPoint_big(x0+a,y0+b,1,Pen_Color);
+ 535   2        }
+ 536   1      } 
+ 537          
+C51 COMPILER V9.54   TFT                                                                   01/09/2019 09:18:14 PAGE 10  
+
+ 538          
+ 539          
+ 540          
+ 541          
+ 542          
+ 543          
+ 544          
+ 545          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   3432    ----
+   CONSTANT SIZE    =   3200    ----
+   XDATA SIZE       =      1     143
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

@@ -1,0 +1,242 @@
+C51 COMPILER V9.54   TOUCH_MAIN                                                            01/09/2019 14:30:03 PAGE 1   
+
+
+C51 COMPILER V9.54, COMPILATION OF MODULE TOUCH_MAIN
+OBJECT MODULE PLACED IN .\touch_main.obj
+COMPILER INVOKED BY: D:\Program Files (x86)\keil\C51\BIN\C51.EXE ..\hardware\touch_main\touch_main.c LARGE OPTIMIZE(8,SP
+                    -EED) BROWSE INCDIR(..\hardware\chuankou;..\hardware\dongtai;..\hardware\flash;..\hardware\huanjing;..\hardware\led_key;.
+                    -.\hardware\paint;..\hardware\ruqing;..\hardware\touch_main;..\hardware\yaokong;..\hardware\zitai;..\main;..\system\bin;.
+                    -.\system\delay;..\system\iic;..\system\interrupt;..\system\spi;..\system\stc;..\tft_touch_sd\font;..\tft_touch_sd\touch;
+                    -..\tft_touch_sd\tft;..\tft_touch_sd\txt;..\hardware\peizhi;..\hardware\communicat;..\hardware\phonebook) DEBUG OBJECTEXT
+                    -END PRINT(.\touch_main.lst) TABS(2) OBJECT(.\touch_main.obj)
+
+line level    source
+
+   1          #include <stdio.h>
+   2          #include "tft.h"
+   3          #include "bin.h"
+   4          #include "txt.h"
+   5          #include "touch.h"
+   6          #include "touch_main.h"
+   7          #include "paint.h"
+   8          #include "yaokong.h"   
+   9          #include "chuankou.h"
+  10          #include "dongtai.h"
+  11          #include "huanjing.h"
+  12          #include "ruqing.h"
+  13          #include "zitai.h"
+  14          #include "communicat.h"
+  15          #include "phonebook.h"
+  16          
+  17          extern unsigned char code phone[6050];
+  18          //extern unsigned char code phone[3025];
+  19          extern unsigned char code phonebooks[6050];
+  20          unsigned char TouchNumber=0;
+  21          /************************ 界面显示框架***********************/
+  22          void MainFrame(void)
+  23          {
+  24   1        TFT_ClearONELINE(0,RED);
+  25   1        TFT_ShowString(0,0,"CPU:STC15W4K48S4",WHITE,RED);
+  26   1        TFT_ShowString_W25(20,0,2,"易思达科技",WHITE,RED);
+  27   1        
+  28   1        TFT_ClearArea(0,16,240,320-16,LIGHTBLUE);
+  29   1        //显示图标 及 图标对应功能语句
+  30   1        TFT_ShowString_W25(2,7,2,"触摸画板",WHITE,MAGENTA);
+  31   1        TFT_ShowString_W25(11,7,2,"遥控继电",WHITE,MAGENTA);
+  32   1        TFT_ShowString_W25(20,7,2,"配置界面",WHITE,MAGENTA);
+  33   1      
+  34   1        TFT_ShowString_W25(2,13,2,"  拨号  ",WHITE,MAGENTA);
+  35   1        TFT_ShowString_W25(11,13,2,"环境监测",WHITE,MAGENTA);
+  36   1        TFT_ShowString_W25(20,13,2,"入侵报警",WHITE,MAGENTA);
+  37   1      
+  38   1        TFT_ShowString_W25(2,18,2," 电话簿 ",WHITE,MAGENTA);
+  39   1        //TFT_ShowString_W25(11,18,2,"  拨号  ",WHITE,MAGENTA);
+  40   1        //TFT_ShowString_W25(20,18,2," 电话簿 ",WHITE,MAGENTA);
+  41   1      
+  42   1        //打开和显示主界面图片
+  43   1        
+  44   1        DISP_BIN_PT_W25(17,50,55,55,0x619000,0x61BF44);     //(45,50)
+  45   1        DISP_BIN_PT_W25(92,50,55,55,0x61B000,0x61DF44);     //(140,50)
+  46   1        DISP_BIN_PT_W25(167,50,55,55,0x61D000,0x61FF44);    //(140,50)
+  47   1          
+  48   1        //DISP_BIN_PT_W25(17,140,55,55,0x61F000,0x621F44);    //(45,140)
+  49   1        DISP_BIN_PT(17,140,55,55,phone);
+  50   1        DISP_BIN_PT_W25(92,140,55,55,0x621000,0x623F44);    //(140,140)
+C51 COMPILER V9.54   TOUCH_MAIN                                                            01/09/2019 14:30:03 PAGE 2   
+
+  51   1        DISP_BIN_PT_W25(167,140,55,55,0x623000,0x625F44);   //(140,50)
+  52   1        
+  53   1        DISP_BIN_PT(17,230,55,55,phonebooks);
+  54   1        //DISP_BIN_PT_W25(17,230,55,55,0x625000,0x627F44);    //(45,230)
+  55   1        //DISP_BIN_PT(92,230,55,55,phone);
+  56   1        //DISP_BIN_PT(167,230,55,55,phonebooks);  
+  57   1      }
+  58          
+  59          
+  60          
+  61          /************************ 触控功能***********************/ // USART1_Init();USART2_Init();
+  62          
+  63          
+  64          void MainTouch(void)
+  65          { 
+  66   1          
+  67   1        MainFrame();
+  68   1        while(1)
+  69   1        {
+  70   2          laidian(); 
+  71   2          if(!Touch_IRQ())
+  72   2          {
+  73   3            if(Convert_Pos()) //得到坐标值
+  74   3            {
+  75   4              TouchNumber=0;
+  76   4              if(tp_pixlcd.y>50 && tp_pixlcd.y<105)  //第一排 (30:30+55)
+  77   4              {
+  78   5                if(tp_pixlcd.x>17 && tp_pixlcd.x<72)//图一(17:17+55)
+  79   5                  {TouchNumber=1;}
+  80   5                else if(tp_pixlcd.x>92 && tp_pixlcd.x<147)//图二(92:92+55)
+  81   5                  {TouchNumber=2;}
+  82   5                          else if(tp_pixlcd.x>167 && tp_pixlcd.x<222)//图三(167:167+55)
+  83   5                  {TouchNumber=3;}
+  84   5      
+  85   5              }
+  86   4              else if(tp_pixlcd.y>140 && tp_pixlcd.y<195)  //第二排 (125:125+55)
+  87   4              {
+  88   5                if(tp_pixlcd.x>17 && tp_pixlcd.x<72)//图一(17:17+55)
+  89   5                  {TouchNumber=4;}
+  90   5                else if(tp_pixlcd.x>92 && tp_pixlcd.x<147)//图二(92:92+55)
+  91   5                  {TouchNumber=5;}
+  92   5                          else if(tp_pixlcd.x>167 && tp_pixlcd.x<222)//图三(167:167+55)
+  93   5                  {TouchNumber=6;}
+  94   5              }
+  95   4              else if(tp_pixlcd.y>230 && tp_pixlcd.y<285)  //第三排 (220:220+55)
+  96   4              {
+  97   5                if(tp_pixlcd.x>17 && tp_pixlcd.x<72)//图一
+  98   5                  {TouchNumber=7;}
+  99   5                /*else if(tp_pixlcd.x>92 && tp_pixlcd.x<147)//图二
+ 100   5                  {TouchNumber=8;}                      
+ 101   5                else if(tp_pixlcd.x>167 && tp_pixlcd.x<222)
+ 102   5                  {TouchNumber=9;}*/
+ 103   5              }
+ 104   4      
+ 105   4              if(TouchNumber==1)
+ 106   4              {
+ 107   5                TFT_ShowString_W25(2,7,2,"触摸画板",WHITE,BLUE);
+ 108   5                break;
+ 109   5              }
+ 110   4              else if(TouchNumber==2)
+ 111   4              {
+ 112   5                TFT_ShowString_W25(11,7,2,"遥控继电",WHITE,BLUE);
+C51 COMPILER V9.54   TOUCH_MAIN                                                            01/09/2019 14:30:03 PAGE 3   
+
+ 113   5                break;
+ 114   5              }       
+ 115   4              else if(TouchNumber==3)
+ 116   4              {
+ 117   5                TFT_ShowString_W25(20,7,2,"配置界面",WHITE,BLUE);
+ 118   5                break;
+ 119   5              }
+ 120   4              else if(TouchNumber==4)
+ 121   4              {
+ 122   5                //TFT_ShowString_W25(2,13,2,"",WHITE,BLUE);
+ 123   5                TFT_ShowString_W25(2,13,2,"  拨号  ",WHITE,BLUE);
+ 124   5                break;
+ 125   5              }
+ 126   4              else if(TouchNumber==5)
+ 127   4              {
+ 128   5                TFT_ShowString_W25(11,13,2,"环境监测",WHITE,BLUE);
+ 129   5                break;
+ 130   5              }
+ 131   4              else if(TouchNumber==6)
+ 132   4              {
+ 133   5                TFT_ShowString_W25(20,13,2,"入侵报警",WHITE,BLUE);
+ 134   5                break;
+ 135   5              }
+ 136   4              else if(TouchNumber==7)
+ 137   4              {
+ 138   5                //TFT_ShowString_W25(2,18,2,"姿态调整",WHITE,BLUE);
+ 139   5                TFT_ShowString_W25(2,18,2," 电话簿 ",WHITE,BLUE);
+ 140   5                break;
+ 141   5              }
+ 142   4            /*else if(TouchNumber==8)
+ 143   4            {
+ 144   4                TFT_ShowString_W25(11,18,2,"  拨号  ",RED,BLUE);
+ 145   4                break;
+ 146   4            }
+ 147   4            else if(TouchNumber==9)
+ 148   4            {
+ 149   4                TFT_ShowString_W25(20,18,2," 电话簿 ",RED,BLUE);
+ 150   4                break;
+ 151   4            }*/
+ 152   4            }
+ 153   3          }
+ 154   2        }
+ 155   1      
+ 156   1        while(!Touch_IRQ());//等待触摸松开
+ 157   1      
+ 158   1          switch(TouchNumber)
+ 159   1        {
+ 160   2          case 1:
+ 161   2          {
+ 162   3            PaintTouch(); break;
+ 163   3          }
+ 164   2          case 2:
+ 165   2          {
+ 166   3            YaokJidTouch();break;
+ 167   3          }
+ 168   2          case 3:
+ 169   2          {
+ 170   3            peizhiTouch();break;
+ 171   3        
+ 172   3          }
+ 173   2          case 4:
+ 174   2          {
+C51 COMPILER V9.54   TOUCH_MAIN                                                            01/09/2019 14:30:03 PAGE 4   
+
+ 175   3             //DongtJiancTouch();
+ 176   3            CommunicatTouch();
+ 177   3            break;
+ 178   3      
+ 179   3          }
+ 180   2          case 5:
+ 181   2          {
+ 182   3            HuanjJiancTouch();break;
+ 183   3      
+ 184   3          }
+ 185   2              case 6:
+ 186   2          {
+ 187   3            RuqBaojTouch();break;
+ 188   3        
+ 189   3          }
+ 190   2              case 7:
+ 191   2          {
+ 192   3            TxtTouch();
+ 193   3            //ZitTiaozTouch();
+ 194   3            break;
+ 195   3          }
+ 196   2            /*  case 8:
+ 197   2          {
+ 198   2            CommunicatTouch();break;
+ 199   2          }
+ 200   2              case 9:
+ 201   2          {
+ 202   2            break;
+ 203   2          }*/
+ 204   2          
+ 205   2        }
+ 206   1      }
+ 207          
+ 208          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   1374    ----
+   CONSTANT SIZE    =     91    ----
+   XDATA SIZE       =      1    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

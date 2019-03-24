@@ -1,0 +1,158 @@
+C51 COMPILER V9.05   PUZZLE                                                                09/09/2016 17:02:04 PAGE 1   
+
+
+C51 COMPILER V9.05, COMPILATION OF MODULE PUZZLE
+OBJECT MODULE PLACED IN .\puzzle.obj
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE ..\hardware\puzzle\puzzle.c LARGE BROWSE INCDIR(..\hardware\chuankou;..\har
+                    -dware\dongtai;..\hardware\flash;..\hardware\huanjing;..\hardware\led_key;..\hardware\paint;..\hardware\ruqing;..\hardwar
+                    -e\touch_main;..\hardware\yaokong;..\hardware\zitai;..\main;..\system\bin;..\system\delay;..\system\iic;..\system\interru
+                    -pt;..\system\spi;..\system\stc;..\tft_touch_sd\font;..\tft_touch_sd\touch;..\tft_touch_sd\tft;..\tft_touch_sd\txt) DEBUG
+                    - OBJECTEXTEND PRINT(.\puzzle.lst) OBJECT(.\puzzle.obj)
+
+line level    source
+
+   1          #include "puzzle.h"
+   2          #include "tft.h"
+   3          #include "touch.h"
+   4          #include "txt.h"
+   5          #include "bin.h"
+   6          void PuzzleFrame(void)
+   7          { 
+   8   1              TFT_ClearONELINE(0,RED);
+   9   1          TFT_ShowString(0,0,"CPU:STC15W4K48S4",WHITE,RED);                    
+  10   1              TFT_ShowString_SD(20,0,"易思达科技",WHITE,RED);
+  11   1          //TFT_ShowString(22,0,"华夏学院",WHITE,RED);
+  12   1              TFT_ClearArea(0,16,240,320-32,LIGHTBLUE); //清空显示区
+  13   1              TFT_ClearONELINE(19,BLUE);
+  14   1          TFT_ShowString_SD(0,19,"主界面",WHITE,RED); 
+  15   1      }
+  16          //判断按下了九宫格中的哪个，0代表不在九宫格内
+  17          unsigned char ClickPosition(unsigned int x,unsigned int y)
+  18          {
+  19   1              unsigned char result=0;
+  20   1              if(x>=31&&x<=80&&y>=31&&y<=80)
+  21   1                      result=1;
+  22   1              else if(x>=81&&x<=133&&y>=31&&y<=80)
+  23   1                      result=2;
+  24   1              else if(x>=134&&x<=183&&y>=31&&y<=80)
+  25   1                      result=3;
+  26   1              else if(x>=31&&x<=80&&y>=81&&y<=133)
+  27   1                      result=4;
+  28   1              else if(x>=81&&x<=133&&y>=81&&y<=133)
+  29   1                      result=5;
+  30   1              else if(x>=134&&x<=183&&y>=81&&y<=133)
+  31   1                      result=6;
+  32   1              else if(x>=31&&x<=80&&y>=134&&y<=183)
+  33   1                      result=7;
+  34   1              else if(x>=81&&x<=133&&y>=134&&y<=183)
+  35   1                      result=8;
+  36   1              else if(x>=134&&x<=183&&y>=134&&y<=183)
+  37   1                      result=9;
+  38   1              else if(tp_pixlcd.x<48&&tp_pixlcd.y>298)          //下标签栏"主界面"
+  39   1                      result=10;
+  40   1              return result;
+  41   1      }
+  42          
+  43          //判断按下的那个宫格是否可以移动
+  44          unsigned char CheckPosition(unsigned char kp,unsigned char ps)
+  45          {
+  46   1              unsigned char result=0;
+  47   1              if(kp==1&&(ps==2||ps==4))
+  48   1                      result=1;
+  49   1              else if(kp==2&&(ps==1||ps==3||ps==5))
+  50   1                      result=1;
+  51   1              else if(kp==3&&(ps==2||ps==6))
+C51 COMPILER V9.05   PUZZLE                                                                09/09/2016 17:02:04 PAGE 2   
+
+  52   1                      result=1;
+  53   1              else if(kp==4&&(ps==1||ps==5||ps==7))
+  54   1                      result=1;
+  55   1              else if(kp==5&&(ps==2||ps==4||ps==6||ps==8))
+  56   1                      result=1;
+  57   1              else if(kp==6&&(ps==3||ps==5||ps==9))
+  58   1                      result=1;
+  59   1              else if(kp==7&&(ps==4||ps==8))
+  60   1                      result=1;
+  61   1              else if(kp==8&&(ps==7||ps==5||ps==9))
+  62   1                      result=1;
+  63   1              else if(kp==9&&(ps==6||ps==8))
+  64   1                      result=1;
+  65   1              return result;
+  66   1      }
+  67          //交换位置,kp为空格的位置,ps为单击的位置,pic为变换位置的图片
+  68          void ChangePosition(unsigned char kp,unsigned char ps,unsigned char pic)
+  69          {
+  70   1       //定义九宫格的起始坐标
+  71   1              unsigned char positions[9][2]={
+  72   1                      {31,31},{82,31},{133,31},
+  73   1                      {31,82},{82,82},{133,82},
+  74   1                      {31,133},{82,133},{133,133}
+  75   1              };
+  76   1              DISP_BIN_PT(positions[kp-1][0],positions[kp-1][1],50,50,pic-1);
+  77   1              LCD_DrawBox(positions[ps-1][0],positions[ps-1][1],50,50,LIGHTBLUE);
+  78   1      }
+  79          
+  80          void PuzzleTouch(void)
+  81          {
+  82   1              unsigned char i,cp,kp;
+  83   1               //九宫格的位置
+  84   1              unsigned char position[9]={3,2,5,6,1,7,4,8,0};
+  85   1               //空的那个格所在位置
+  86   1              kp=9;  
+  87   1              PuzzleFrame();
+  88   1              //首先用8条线画出九宫格
+  89   1              LCD_DrawLine(30,30,183,30,BLUE);
+  90   1              LCD_DrawLine(30,81,183,81,BLUE);
+  91   1              LCD_DrawLine(30,132,183,132,BLUE);
+  92   1              LCD_DrawLine(30,183,183,183,BLUE);
+  93   1              LCD_DrawLine(30,30,30,183,BLUE);
+  94   1              LCD_DrawLine(81,30,81,183,BLUE);
+  95   1              LCD_DrawLine(132,30,132,183,BLUE);
+  96   1              LCD_DrawLine(183,30,183,183,BLUE);
+  97   1              
+  98   1              SCAN_WJ(OPEN_WJJ(OPEN_WJJ(fat_info.BPB_FirstCluster_number,"SYS"),"PTP"));
+*** ERROR C200 IN LINE 98 OF ..\hardware\puzzle\puzzle.c: left side of '.' requires struct/union
+  99   1               //按照数组position数组的排列初始化8个图片,0代表空的那个格
+ 100   1              for(i=0;i<9;i++)
+ 101   1              {
+ 102   2                      if(position[i]!=0)
+ 103   2                      {
+ 104   3                              DISP_BIN_PT(31+((i%3)*51),31+(i/3*51),50,50,position[i]-1);
+ 105   3                      }
+ 106   2              }
+ 107   1       
+ 108   1       //开始游戏
+ 109   1              while(1)
+ 110   1              {
+ 111   2                      if(!Touch_IRQ())
+ 112   2                      {
+C51 COMPILER V9.05   PUZZLE                                                                09/09/2016 17:02:04 PAGE 3   
+
+ 113   3                              if(Convert_Pos())       //得到坐标值
+ 114   3                              {
+ 115   4         //判断按下的位置是哪个宫格                                             
+ 116   4                                      cp=ClickPosition(tp_pixlcd.x,tp_pixlcd.y);
+ 117   4                                      if(cp==10)  break;                                      //扫描触摸屏 判断是否返回主菜单
+ 118   4                                         //如果是九宫格中的任一一个并且可以移动
+ 119   4                                      else if(cp>0&&CheckPosition(kp,cp)==1)
+ 120   4                                      {
+ 121   5                                          //变换图片位置
+ 122   5                                              ChangePosition(kp,cp,position[cp-1]);
+ 123   5                                                      //变换图片位置后要修改相应的变量
+ 124   5                                              position[kp-1]=position[cp-1];
+ 125   5                                              position[cp-1]=0;
+ 126   5                                              kp=cp;
+ 127   5                      //判断变换位置之后是否拼好图了
+ 128   5                                              if(position[0]==1&&position[1]==2&&position[2]==3&&position[3]==4&&position[4]==5&&position[5]==6&&po
+             -sition[6]==7&&position[7]==8&&position[8]==0)
+ 129   5                                              {       DISP_BIN_PT(133,133,50,50,8);
+ 130   6                                                      TFT_ShowString(3,13,"Congratulations!",RED,WHITE);
+ 131   6                                              }
+ 132   5                                      }
+ 133   4                                      
+ 134   4                              }
+ 135   3                      }
+ 136   2              }
+ 137   1      }
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  1 ERROR(S)

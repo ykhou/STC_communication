@@ -1,0 +1,206 @@
+C51 COMPILER V9.54   QIYA_BMP085                                                           01/08/2019 23:51:26 PAGE 1   
+
+
+C51 COMPILER V9.54, COMPILATION OF MODULE QIYA_BMP085
+OBJECT MODULE PLACED IN .\qiya_bmp085.obj
+COMPILER INVOKED BY: D:\Program Files (x86)\keil\C51\BIN\C51.EXE ..\hardware\zitai\qiya_bmp085.c LARGE OPTIMIZE(8,SPEED)
+                    - BROWSE INCDIR(..\hardware\chuankou;..\hardware\dongtai;..\hardware\flash;..\hardware\huanjing;..\hardware\led_key;..\ha
+                    -rdware\paint;..\hardware\ruqing;..\hardware\touch_main;..\hardware\yaokong;..\hardware\zitai;..\main;..\system\bin;..\sy
+                    -stem\delay;..\system\iic;..\system\interrupt;..\system\spi;..\system\stc;..\tft_touch_sd\font;..\tft_touch_sd\touch;..\t
+                    -ft_touch_sd\tft;..\tft_touch_sd\txt;..\hardware\peizhi;..\hardware\communicat) DEBUG OBJECTEXTEND PRINT(.\qiya_bmp085.ls
+                    -t) TABS(2) OBJECT(.\qiya_bmp085.obj)
+
+line level    source
+
+   1          #include "STC15F2K60S2.h"
+   2          #include "tft.h"
+   3          #include "txt.h"
+   4          #include "iic.h"
+   5          #include "delay.h"
+   6          #include "qiya_bmp085.h"
+   7          #define BMP085_AD   0xee    //气压BMP085
+   8          
+   9          //?????BMP085????*******************************
+  10          
+  11          #define BMP085_AD   0xee    //气压BMP085
+  12          #define OSS 0 
+  13          int ac1;
+  14          int ac2; 
+  15          int ac3; 
+  16          unsigned int ac4;
+  17          unsigned int ac5;
+  18          unsigned int ac6;
+  19          int b1; 
+  20          int b2;
+  21          int mb;
+  22          int mc;
+  23          int md;
+  24          
+  25          unsigned char xdata bmp085BUF[7];   
+  26          void Single_Write(unsigned char SlaveAddress,unsigned char REG_Address,unsigned char REG_data)
+  27          {
+  28   1          I2CStart();                  //????
+  29   1          I2CSendByte(SlaveAddress);   //??????+???
+  30   1          I2CSendByte(REG_Address);    //???????
+  31   1          I2CSendByte(REG_data);       //???????
+  32   1          I2CStop();                   //??????
+  33   1      }
+  34          unsigned char Single_Read(unsigned char REG_Address)
+  35          {  unsigned char REG_data;
+  36   1          I2CStart();                          //????
+  37   1          I2CSendByte(BMP085_AD);           //??????+???
+  38   1          I2CSendByte(REG_Address);            //???????? 
+  39   1          I2CStart();                          //????
+  40   1          I2CSendByte(BMP085_AD+1);         //??????+???
+  41   1          REG_data=I2CRecvByte();              //???????
+  42   1          I2CSendACK(1);   
+  43   1          I2CStop();                           //????
+  44   1          return REG_data; 
+  45   1      }
+  46          int Multiple_read(unsigned char ST_Address)
+  47          {   
+  48   1          unsigned char msb, lsb;
+  49   1          int _data;
+  50   1          I2CStart();                          //????
+C51 COMPILER V9.54   QIYA_BMP085                                                           01/08/2019 23:51:26 PAGE 2   
+
+  51   1          I2CSendByte(BMP085_AD);    //??????+???
+  52   1          I2CSendByte(ST_Address);             //????????
+  53   1          I2CStart();                          //????
+  54   1          I2CSendByte(BMP085_AD+1);         //??????+???
+  55   1      
+  56   1          msb = I2CRecvByte();                 //BUF[0]??
+  57   1          I2CSendACK(0);                       //??ACK
+  58   1          lsb = I2CRecvByte();     
+  59   1          I2CSendACK(1);                       //?????????NOACK
+  60   1      
+  61   1          I2CStop();                           //????
+  62   1          delayms(5);
+  63   1          _data = msb << 8;
+  64   1          _data |= lsb; 
+  65   1          return _data;
+  66   1      }
+  67          //***************读温度*****************************************************
+  68          int bmp085ReadTemp(void)
+  69          {
+  70   1      
+  71   1          I2CStart();                  //????
+  72   1          I2CSendByte(BMP085_AD);   //??????+???
+  73   1          I2CSendByte(0xF4);            // write register address
+  74   1          I2CSendByte(0x2E);        // write register data for temp
+  75   1          I2CStop();                   //??????
+  76   1          delay(10);  // max time is 4.5ms
+  77   1        
+  78   1        return Multiple_read(0xF6);
+  79   1      }
+  80          //****************读压强*********************************************
+  81          int bmp085ReadPressure(void)
+  82          {
+  83   1          I2CStart();                   //????
+  84   1          I2CSendByte(BMP085_AD);   //??????+???
+  85   1          I2CSendByte(0xF4);            // write register address
+  86   1          I2CSendByte(0x34);          // write register data for pressure
+  87   1          I2CStop();                    //??????
+  88   1          delay(10);                        // max time is 4.5ms
+  89   1        
+  90   1          return Multiple_read(0xF6); 
+  91   1      }
+  92          
+  93          //**************************************************************
+  94          void Init_BMP085(void)
+  95          {
+  96   1        ac1 = Multiple_read(0xAA);
+  97   1        ac2 = Multiple_read(0xAC);
+  98   1        ac3 = Multiple_read(0xAE);
+  99   1        ac4 = Multiple_read(0xB0);
+ 100   1        ac5 = Multiple_read(0xB2);
+ 101   1        ac6 = Multiple_read(0xB4);
+ 102   1        b1 =  Multiple_read(0xB6);
+ 103   1        b2 =  Multiple_read(0xB8);
+ 104   1        mb =  Multiple_read(0xBA);
+ 105   1        mc =  Multiple_read(0xBC);
+ 106   1        md =  Multiple_read(0xBE);
+ 107   1      }
+ 108           
+ 109          void conversion(long temp_data)  
+ 110          {  
+ 111   1          bmp085BUF[0]=temp_data/100000+0x30 ;
+ 112   1          temp_data=temp_data%100000;   //???? 
+C51 COMPILER V9.54   QIYA_BMP085                                                           01/08/2019 23:51:26 PAGE 3   
+
+ 113   1          bmp085BUF[1]=temp_data/10000+0x30 ;
+ 114   1          temp_data=temp_data%10000;   //????
+ 115   1          bmp085BUF[2]=temp_data/1000+0x30 ;
+ 116   1          temp_data=temp_data%1000;    //????
+ 117   1          bmp085BUF[3]=temp_data/100+0x30   ;
+ 118   1          temp_data=temp_data%100;     //????
+ 119   1          bmp085BUF[4]=temp_data/10+0x30    ;
+ 120   1          temp_data=temp_data%10;      //????
+ 121   1          bmp085BUF[5]=temp_data+0x30;  
+ 122   1          bmp085BUF[6]='\0';
+ 123   1      }
+ 124          void bmp085Convert(void)
+ 125          {
+ 126   1        long ut;
+ 127   1        long up;
+ 128   1        long x1, x2, b5, b6, x3, b3, p;
+ 129   1        unsigned long b4, b7;
+ 130   1        long  temperature;
+ 131   1        long  pressure;
+ 132   1        
+ 133   1        ut = bmp085ReadTemp();
+ 134   1        ut = bmp085ReadTemp();     // ????
+ 135   1        up = bmp085ReadPressure();
+ 136   1        up = bmp085ReadPressure();  // ????
+ 137   1        
+ 138   1        x1 = ((long)ut - ac6) * ac5 >> 15;
+ 139   1        x2 = ((long) mc << 11) / (x1 + md);
+ 140   1        b5 = x1 + x2;
+ 141   1        temperature = (b5 + 8) >> 4;
+ 142   1        
+ 143   1        conversion(temperature);
+ 144   1        TFT_ShowString_W25(0,2,2,"温度:",WHITE,BLUE);
+ 145   1        TFT_ShowString(5,2,bmp085BUF,WHITE,BLUE);
+ 146   1        TFT_ShowString_W25(11,2,2,"度",WHITE,BLUE); 
+ 147   1        
+ 148   1        b6 = b5 - 4000;
+ 149   1        x1 = (b2 * (b6 * b6 >> 12)) >> 11;
+ 150   1        x2 = ac2 * b6 >> 11;
+ 151   1        x3 = x1 + x2;
+ 152   1        b3 = (((long)ac1 * 4 + x3) + 2)/4;
+ 153   1        x1 = ac3 * b6 >> 13;
+ 154   1        x2 = (b1 * (b6 * b6 >> 12)) >> 16;
+ 155   1        x3 = ((x1 + x2) + 2) >> 2;
+ 156   1        b4 = (ac4 * (unsigned long) (x3 + 32768)) >> 15;
+ 157   1        b7 = ((unsigned long) up - b3) * (50000 >> OSS);
+ 158   1        if( b7 < 0x80000000)
+ 159   1             p = (b7 * 2) / b4 ;
+ 160   1                 else  
+ 161   1              p = (b7 / b4) * 2;
+ 162   1        x1 = (p >> 8) * (p >> 8);
+ 163   1        x1 = (x1 * 3038) >> 16;
+ 164   1        x2 = (-7357 * p) >> 16;
+ 165   1         pressure = p + ((x1 + x2 + 3791) >> 4);  
+ 166   1        conversion(pressure);
+ 167   1        TFT_ShowString_W25(15,2,2,"气压:",WHITE,BLUE);
+ 168   1        TFT_ShowString(20,2,bmp085BUF,WHITE,BLUE);
+ 169   1        TFT_ShowString_W25(26,2,2,"帕",WHITE,BLUE);            
+ 170   1                 
+ 171   1      }
+ 172          
+
+
+C51 COMPILER V9.54   QIYA_BMP085                                                           01/08/2019 23:51:26 PAGE 4   
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   2142    ----
+   CONSTANT SIZE    =     18    ----
+   XDATA SIZE       =     29      56
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)
